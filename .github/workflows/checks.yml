@@ -1,0 +1,29 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install pyserial -r upper/camera-preview/requirements.txt
+      - run: sh tools/check.sh
+  firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [controller, uart_check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'platformio>=6,<7'
+      - run: pio run -d firmware/${{ matrix.project }}

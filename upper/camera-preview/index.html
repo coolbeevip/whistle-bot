@@ -1,0 +1,249 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#141718" />
+    <title>Whistle Bot</title>
+    <meta name="color-scheme" content="dark" />
+    <link rel="stylesheet" href="/static/console.css" />
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Whistle Bot</h1>
+      <small id="chassis">Connecting…</small>
+    </header>
+    <main>
+      <section id="drive" aria-label="Drive">
+        <figure>
+          <img alt="Live rover camera" /><output class="overlay" id="camera"
+            >Connecting…</output
+          ><output class="overlay" id="clock">Standby</output
+          ><span class="overlay" id="resolution" hidden></span
+          ><button class="overlay" id="record" disabled>Record</button>
+        </figure>
+        <div id="driveTools">
+          <div id="inputModes" role="group" aria-label="Drive control">
+            <button id="joystickMode" aria-pressed="true">Joystick</button
+            ><button id="precisionMode" aria-pressed="false">Precision</button
+            ><button id="autoMode" aria-pressed="false">Auto</button>
+          </div>
+        </div>
+        <div id="controls">
+          <div
+            id="stick"
+            class="stick"
+            role="group"
+            tabindex="0"
+            aria-label="Drive joystick. Drag or use the arrow keys."
+            aria-disabled="true"
+          >
+            <span class="arrow" data-dir="forward"></span
+            ><span class="arrow" data-dir="left"></span
+            ><span class="arrow" data-dir="reverse"></span
+            ><span class="arrow" data-dir="right"></span
+            ><span class="knob"></span>
+          </div>
+          <div
+            id="precision"
+            role="group"
+            aria-label="Precision controls"
+            hidden
+          >
+            <div class="goalChoices">
+              <div class="goalRow" aria-label="Movement type" role="group">
+                <button data-kind="distance">Move</button
+                ><button data-kind="angle">Turn</button>
+              </div>
+              <div class="goalRow" aria-label="Direction" role="group">
+                <button id="dirA"></button><button id="dirB"></button>
+              </div>
+            </div>
+            <div class="goalAmount">
+              <div id="goalStepper">
+                <button data-nudge="-10">«</button
+                ><button data-nudge="-1">‹</button
+                ><output id="goalValue" aria-label="Target"></output
+                ><button data-nudge="1">›</button
+                ><button data-nudge="10">»</button>
+              </div>
+              <div class="goalRow" aria-label="Target presets" role="group">
+                <button></button><button></button><button></button
+                ><button></button>
+              </div>
+            </div>
+            <button id="runGoal" disabled>GO</button>
+          </div>
+          <div id="autoPanel" hidden>
+            <label for="instruction">Task</label
+            ><textarea
+              id="instruction"
+              rows="2"
+              maxlength="500"
+              placeholder="Go to the door and stop"
+            ></textarea>
+            <output id="autoState" role="status"></output
+            ><button id="autoRun" disabled>GO</button>
+          </div>
+          <p id="notice" role="status"></p>
+        </div>
+        <div id="transmission" role="group" aria-label="Drive settings">
+          <div id="gearGroup" role="group" aria-label="Speed gear">
+            <button data-gear="gear1" disabled>G1<small></small></button>
+            <button data-gear="gear2" disabled>G2<small></small></button>
+            <button data-gear="gear3" disabled>G3<small></small></button>
+            <button data-gear="gear4" disabled>G4<small></small></button>
+          </div>
+          <button id="mode" aria-label="Sport mode" disabled>
+            <span>Comfort</span><small>Mode</small>
+          </button>
+        </div>
+      </section>
+      <section id="library" aria-label="Recordings" hidden>
+        <video id="player" controls playsinline hidden></video>
+        <div id="manage" hidden>
+          <label><input id="allFiles" type="checkbox" />Select all</label
+          ><button id="delete" disabled>Delete selected</button>
+        </div>
+        <output id="fileMessage" role="status"></output>
+        <div id="files"></div>
+      </section>
+      <section id="settings" aria-label="Settings" hidden>
+        <h2>Resolution</h2>
+        <div class="settingsGroup">
+          <div class="setting">
+            <label for="previewWidth">Preview</label
+            ><select id="previewWidth">
+              <option value="320">320 × 180</option>
+              <option value="640" selected>640 × 360 (Default)</option>
+              <option value="1280">1280 × 720</option>
+              <option value="1920">1920 × 1080</option>
+              <option value="2592">2592 × 1944</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="recordWidth">Recording</label
+            ><select id="recordWidth">
+              <option value="640">640 × 360</option>
+              <option value="1280" selected>1280 × 720 (Default)</option>
+              <option value="1920">1920 × 1080</option>
+              <option value="2592">2592 × 1944</option>
+            </select>
+          </div>
+        </div>
+        <fieldset id="drivePrefs" disabled>
+          <legend>Chassis</legend>
+          <div class="settingsGroup">
+            <div class="setting gearRow">
+              <label for="gear1">Gear 1</label
+              ><input
+                id="gear1"
+                type="range"
+                min="20"
+                max="1070"
+                step="10"
+                value="200"
+              /><output for="gear1"></output>
+            </div>
+            <div class="setting gearRow">
+              <label for="gear2">Gear 2</label
+              ><input
+                id="gear2"
+                type="range"
+                min="20"
+                max="1070"
+                step="10"
+                value="400"
+              /><output for="gear2"></output>
+            </div>
+            <div class="setting gearRow">
+              <label for="gear3">Gear 3</label
+              ><input
+                id="gear3"
+                type="range"
+                min="20"
+                max="1070"
+                step="10"
+                value="600"
+              /><output for="gear3"></output>
+            </div>
+            <div class="setting gearRow">
+              <label for="gear4">Gear 4</label
+              ><input
+                id="gear4"
+                type="range"
+                min="20"
+                max="1070"
+                step="10"
+                value="800"
+              /><output for="gear4"></output>
+            </div>
+            <div class="setting">
+              <label for="turn">Turn speed</label
+              ><select id="turn">
+                <option value="slow">Slow</option>
+                <option value="normal" selected>Normal</option>
+                <option value="fast">Fast</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+        <h2 id="aiHeading">AI</h2>
+        <div class="settingsGroup">
+          <label class="setting"
+            >Endpoint<input
+              id="aiEndpoint"
+              type="url"
+              placeholder="https://…"
+              autocomplete="off"
+          /></label>
+          <label class="setting"
+            >Model<input id="aiModel" placeholder="Optional"
+          /></label>
+          <label class="setting"
+            >API key<input
+              id="aiKey"
+              type="password"
+              placeholder="Optional"
+              autocomplete="new-password"
+          /></label>
+          <div class="aiActions">
+            <button id="aiTest">Test connection</button
+            ><button id="aiSave">Save</button>
+          </div>
+          <output id="aiMessage" role="status"></output>
+        </div>
+      </section>
+    </main>
+    <nav aria-label="Main navigation">
+      <div>
+        <button data-page="drive" aria-current="page">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="2.5" />
+            <path d="M3 10l7 2m11-2-7 2m-2 3v6" /></svg
+          >Drive
+        </button>
+        <button data-page="library">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+            <path d="m10 8 6 4-6 4z" /></svg
+          >Recordings
+        </button>
+        <button data-page="settings">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 6h7m4 0h5M4 12h2m4 0h10M4 18h10m4 0h2" />
+            <circle cx="13" cy="6" r="2" />
+            <circle cx="8" cy="12" r="2" />
+            <circle cx="16" cy="18" r="2" /></svg
+          >Settings
+        </button>
+      </div>
+    </nav>
+    <script src="/static/console.js" defer></script>
+  </body>
+</html>

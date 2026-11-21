@@ -1,0 +1,9 @@
+# Builds, local environments and private overrides
+.pio/
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+.env
+.env.*
+wifi_password.local.h

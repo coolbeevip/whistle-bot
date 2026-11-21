@@ -1,0 +1,11 @@
+[Unit]
+Description=Rover driving and recording console
+
+[Service]
+WorkingDirectory=%h/whistle-rover/camera-preview
+ExecStart=%h/whistle-rover/venv/bin/python %h/whistle-rover/camera-preview/server.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,846 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+:root {
+  --drive-bottom-gap: 8px;
+  --bg: #15191a;
+  --panel: #202627;
+  --line: #364041;
+  --ink: #edf1eb;
+  --muted: #a6b1ad;
+  --accent: #f4c47b;
+  font:
+    16px "Barlow",
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+* {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+body {
+  margin: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+button,
+a,
+input,
+select {
+  font: inherit;
+  accent-color: var(--accent);
+}
+button,
+select {
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 0 13px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.55;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+header,
+main,
+nav > div {
+  width: min(100%, 800px);
+  margin: auto;
+}
+header {
+  padding: calc(10px + env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) 10px
+    max(16px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+h1 {
+  font-size: 21px;
+  letter-spacing: -0.055em;
+  margin: 0;
+  font-weight: 650;
+}
+#chassis {
+  color: var(--muted);
+  font-size: 13px;
+}
+#chassis::before {
+  content: "";
+  display: inline-block;
+  background: #a4947a;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+#chassis.online::before {
+  background: #92dda8;
+}
+main {
+  margin: 0 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px max(12px, env(safe-area-inset-right)) var(--drive-bottom-gap)
+    max(12px, env(safe-area-inset-left));
+}
+#drive {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+figure {
+  margin: 0;
+  position: relative;
+  --frame-ratio: 1.77777778;
+  width: min(100%, calc(42dvh * var(--frame-ratio)));
+  aspect-ratio: var(--frame-ratio);
+  height: auto;
+  align-self: center;
+  justify-self: center;
+  flex: none;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #090c0d;
+}
+figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+img:not([src]) {
+  visibility: hidden;
+}
+figure:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+.overlay {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  color: #fff;
+  background: rgb(12 17 18/0.78);
+  font-size: 12px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+#camera {
+  top: 9px;
+  left: 9px;
+}
+#camera.live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #96e3af;
+}
+#clock {
+  top: 9px;
+  right: 9px;
+}
+#clock.on {
+  color: #ffb2a6;
+}
+#resolution {
+  bottom: 9px;
+  left: 9px;
+}
+#record {
+  bottom: 5px;
+  right: 5px;
+  min-height: 44px;
+  border-color: #ffffff38;
+  padding: 0 12px;
+  font-size: 14px;
+}
+#record:before {
+  content: "";
+  background: #ff766b;
+  border-radius: 50%;
+  width: 11px;
+  height: 11px;
+}
+#record.on:before {
+  border-radius: 2px;
+}
+#controls {
+  flex: 1;
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  padding-bottom: 22px;
+}
+.stick {
+  --size: 240px;
+  position: relative;
+  width: min(var(--size), 70vw, calc(46dvh - 40px));
+  min-width: 125px;
+  aspect-ratio: 1;
+  border: 1px solid #4a5554;
+  border-radius: 50%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  background: radial-gradient(
+    circle,
+    #323a39 0 32%,
+    #202626 33% 62%,
+    #303736 63% 64%,
+    #202625 65%
+  );
+  box-shadow: inset 0 2px 1px #ffffff12;
+}
+.stick[aria-disabled="true"] {
+  opacity: 0.58;
+}
+.knob {
+  pointer-events: none;
+  position: absolute;
+  inset: 32%;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #59605b, #343b38);
+  border: 1px solid #758076;
+  box-shadow: 0 3px 9px #101413;
+  transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+.stick.active .knob {
+  border-color: var(--accent);
+}
+.arrow {
+  position: absolute;
+  pointer-events: none;
+  width: 10px;
+  height: 10px;
+  border: solid #a6ada5;
+  border-width: 2px 2px 0 0;
+}
+.arrow.lit {
+  border-color: var(--accent);
+}
+[data-dir="forward"] {
+  top: 11%;
+  left: 48%;
+  transform: rotate(-45deg);
+}
+[data-dir="right"] {
+  right: 11%;
+  top: 48%;
+  transform: rotate(45deg);
+}
+[data-dir="reverse"] {
+  bottom: 11%;
+  left: 48%;
+  transform: rotate(135deg);
+}
+[data-dir="left"] {
+  left: 11%;
+  top: 48%;
+  transform: rotate(225deg);
+}
+#notice {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 13px;
+  margin: 0;
+  color: var(--accent);
+}
+nav {
+  border-top: 1px solid var(--line);
+  background: #1b2021;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+nav button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 58px;
+}
+nav button[aria-current="page"] {
+  color: var(--accent);
+}
+nav svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#manage,
+.file,
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+.file {
+  flex-wrap: wrap;
+}
+.file label,
+#manage label,
+.setting {
+  min-height: 48px;
+}
+.file label,
+#manage label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.file label {
+  flex: 1;
+  font-size: 14px;
+}
+.file a {
+  display: inline-grid;
+  place-items: center;
+  min-height: 44px;
+  color: var(--accent);
+  font-size: 14px;
+}
+#player {
+  width: 100%;
+  max-height: 48dvh;
+  background: #090c0d;
+}
+#delete:not(:disabled) {
+  color: #ffad9f;
+}
+#fileMessage {
+  color: var(--muted);
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  #drive {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    align-items: center;
+  }
+  figure {
+    width: min(100%, calc(54dvh * var(--frame-ratio)));
+  }
+  .stick {
+    width: min(var(--size), 44dvh);
+  }
+  nav button {
+    min-height: 44px;
+  }
+}
+#settings h2 {
+  margin: 4px 0 8px;
+  font-size: 17px;
+}
+.setting {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.setting label {
+  white-space: nowrap;
+}
+.setting select {
+  min-width: 0;
+  max-width: 100%;
+  justify-self: end;
+}
+#drivePrefs {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+#drivePrefs legend {
+  font-size: 17px;
+  font-weight: 650;
+}
+#transmission {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(70px, 1.45fr);
+  gap: 8px;
+  flex: none;
+}
+#transmission button {
+  min-width: 0;
+  padding: 3px;
+  line-height: 1.1;
+  font-weight: 650;
+}
+#transmission small {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 3px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+#transmission [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.gearRow {
+  display: flex;
+}
+.gearRow input {
+  min-width: 45px;
+  width: 48%;
+  min-height: 44px;
+}
+.gearRow output {
+  width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  #drive figure {
+    grid-row: 1/3;
+  }
+  #drive {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  #controls {
+    min-height: 0;
+  }
+}
+#controls {
+  container-type: size;
+  min-height: 0;
+}
+.stick {
+  width: min(240px, 70vw, 100cqh);
+  min-width: 0;
+}
+#driveTools {
+  display: grid;
+  gap: 6px;
+}
+#inputModes {
+  display: flex;
+  gap: 4px;
+}
+#inputModes button {
+  flex: 1;
+  font-size: 13px;
+}
+#inputModes [aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#drive.precise #controls {
+  container-type: normal;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0;
+}
+#drive.precise #notice {
+  position: static;
+  order: -1;
+  min-height: 1.2em;
+}
+#precision {
+  width: min(100%, 380px);
+  display: grid;
+}
+#precision > .goalAmount,
+#runGoal {
+  margin-top: var(--drive-bottom-gap);
+}
+.goalRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+#precision button {
+  min-height: 44px;
+  padding: 0 4px;
+  touch-action: manipulation;
+}
+#precision [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#goalStepper {
+  display: grid;
+  grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px;
+  gap: 3px;
+  align-items: center;
+  text-align: center;
+}
+#goalStepper button {
+  font-size: 22px;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+#goalValue {
+  white-space: nowrap;
+  font-size: clamp(16px, 5vw, 24px);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+#runGoal:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+#runGoal.stopping:not(:disabled) {
+  background: #ffad9f;
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  #drive.precise {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  #drive.precise #controls {
+    align-self: stretch;
+  }
+  #drive.precise figure {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  #drive.precise #driveTools {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  #drive.precise #controls {
+    grid-column: 2;
+    grid-row: 1/3;
+  }
+}
+#inputModes {
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+}
+#inputModes button {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+}
+#inputModes [aria-pressed="true"] {
+  box-shadow: inset 0 -2px var(--accent);
+  color: var(--accent);
+}
+.goalChoices {
+  display: grid;
+  grid-template-columns: 1fr 1.24fr;
+  gap: 12px;
+}
+.goalChoices .goalRow,
+#gearGroup {
+  gap: 0;
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 2px;
+}
+.goalChoices button,
+.goalAmount button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+.goalChoices [aria-pressed="true"],
+#transmission [aria-pressed="true"] {
+  background: #343d3e;
+}
+.goalAmount {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 8px;
+}
+#goalStepper {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+#goalStepper button {
+  font-size: 24px;
+  color: var(--ink);
+}
+#goalStepper button:active {
+  background: var(--line);
+}
+#goalValue {
+  font-size: clamp(19px, 5vw, 24px);
+}
+.goalAmount .goalRow {
+  padding-top: 4px;
+}
+.goalAmount .goalRow [aria-pressed="true"] {
+  background: #37352e;
+}
+@media (max-height: 620px) {
+  .goalAmount {
+    padding: 4px;
+  }
+  #goalStepper {
+    padding-bottom: 2px;
+  }
+  .goalAmount .goalRow {
+    padding-top: 2px;
+  }
+}
+@media (max-width: 360px), (orientation: landscape) and (max-height: 550px) {
+  .goalChoices {
+    gap: 6px;
+  }
+  .goalChoices button {
+    font-size: 13px;
+  }
+}
+#gearGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#transmission button {
+  border: 0;
+  font-size: 14px;
+}
+#transmission button:not([aria-pressed="true"]) {
+  color: var(--muted);
+}
+.settingsGroup,
+#files:not(:empty) {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 0 12px;
+}
+.settingsGroup .setting:last-child,
+.file:last-child {
+  border-bottom: 0;
+}
+.settingsGroup select {
+  background: var(--bg);
+  font-size: 14px;
+  padding: 0 8px;
+}
+#drivePrefs legend {
+  margin-bottom: 8px;
+}
+#files.empty {
+  display: grid;
+  place-items: center;
+  min-height: 104px;
+  color: var(--muted);
+  font-size: 14px;
+}
+#fileMessage:not(:empty) {
+  display: block;
+  margin: 8px 0;
+}
+#manage {
+  border: 0;
+  margin-bottom: 4px;
+}
+.file {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, 44px);
+  gap: 3px;
+}
+.file button {
+  padding: 0;
+}
+.file time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.file small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.file button {
+  background: var(--bg);
+  border: 0;
+}
+.file a {
+  min-width: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#player {
+  border-radius: 14px;
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  #drive:not(.precise) {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  #drive:not(.precise) figure {
+    grid-column: 1;
+    grid-row: 1/4;
+  }
+  #drive:not(.precise) #driveTools,
+  #drive:not(.precise) #controls,
+  #transmission {
+    grid-column: 2;
+  }
+  #drive:not(.precise) #controls {
+    grid-row: 2;
+    align-self: stretch;
+  }
+  #transmission {
+    grid-row: 3;
+  }
+}
+@media (orientation: portrait) {
+  #drive {
+    container-type: size;
+    --drive-inset: 12px;
+    --wheel: min(260px, 72vw, calc(48dvh - 104px));
+    display: grid;
+    --control-height: max(194px, calc(var(--wheel) + 26px));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 45px minmax(var(--control-height), 1fr) 48px;
+    gap: 8px;
+  }
+  #driveTools {
+    display: contents;
+  }
+  #drive figure {
+    width: min(
+      calc(100cqw + 2 * var(--drive-inset)),
+      calc(
+        max(78px, 100cqh - 117px - var(--control-height)) * var(--frame-ratio)
+      )
+    );
+    justify-self: center;
+    min-height: 0;
+  }
+  #drive figure:fullscreen {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+  }
+  #inputModes {
+    grid-row: 2;
+  }
+  #transmission {
+    grid-row: 4;
+    align-self: end;
+  }
+  #controls {
+    grid-row: 3;
+    container-type: normal;
+    padding: 4px 0 22px;
+  }
+  #stick {
+    width: var(--wheel);
+  }
+  #drive.precise #controls {
+    grid-row: 3 / 5;
+    min-height: 0;
+  }
+  #precision {
+    width: min(100%, 440px);
+  }
+  .goalAmount {
+    display: grid;
+    align-content: center;
+  }
+  #goalValue {
+    font-size: clamp(24px, 8vw, 36px);
+  }
+}
+@media (orientation: portrait) and (min-height: 700px) {
+  #precision .goalChoices button,
+  #runGoal {
+    min-height: 52px;
+  }
+  .goalAmount {
+    padding: 14px 8px;
+  }
+  #goalStepper {
+    min-height: 70px;
+  }
+}
+#autoPanel {
+  width: min(100%, 440px);
+  display: grid;
+  gap: 8px;
+}
+#autoPanel textarea,
+.setting input:not([type="range"]) {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+#autoPanel textarea {
+  resize: vertical;
+  max-height: 100px;
+}
+#autoState,
+#aiMessage {
+  color: var(--muted);
+  font-size: 14px;
+}
+#autoRun:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+#autoPanel textarea {
+  max-height: 76px;
+}
+#settings #aiHeading {
+  margin-top: 20px;
+}
+.aiActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 0;
+}
+#aiMessage:not(:empty) {
+  display: block;
+  padding-bottom: 8px;
+}

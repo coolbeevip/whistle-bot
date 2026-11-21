@@ -1,0 +1,2 @@
+# Camera and serial modules are provided by the OS. See docs/installation.md.
+aiohttp>=3.10,<4

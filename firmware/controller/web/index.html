@@ -1,0 +1,1094 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#141718" /><title>Rover Console</title>
+  <style>
+:root {
+  color-scheme: dark;
+  --ground: #141718;
+  --surface: #202425;
+  --panel: #292e2f;
+  --line: #414647;
+  --ink: #f3f0e9;
+  --muted: #b4bbb9;
+  --amber: #ffc56b;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Barlow", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--ground); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+* { box-sizing: border-box; }
+[hidden], #feedback:empty { display: none !important; }
+body { margin: 0; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+header, main { width: 100%; max-width: 680px; margin: 0 auto; padding-inline: clamp(16px,5vw,32px); }
+header { display: flex; align-items: center; justify-content: space-between; padding-block: 20px 15px; gap: 12px; }
+h1 { display: flex; align-items: center; gap: 10px; font-size: 19px; letter-spacing: -.04em; margin: 0; }
+.mark { display: grid; place-items: center; height: 30px; width: 30px; border-radius: 9px; color: #211b11; background: var(--amber); }
+.mark::before { content: ""; width: 13px; height: 13px; background: currentColor; clip-path: polygon(50% 0,100% 100%,50% 74%,0 100%); }
+#connection { color: var(--muted); font: 12px var(--mono); }
+#connection::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #838a89; margin-right: 7px; }
+body[data-connected="true"] #connection::before { background: #90d6a3; }
+main { min-height: 0; overflow-y: auto; margin-block: 0; padding-bottom: 18px; }
+h2 { font-size: clamp(30px,8vw,43px); line-height: 1.08; letter-spacing: -.055em; margin: 0 0 18px; }
+button, select, input { font: inherit; }
+button, select, input[type=number] { min-height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 10px 14px; }
+button { font-weight: 650; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { color: #abb0ac; cursor: default; background: #232728; }
+button:active:not(:disabled) { background: #414749; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+p, small { line-height: 1.48; text-wrap: pretty; }
+p { margin: 10px 0 14px; }
+small, .note, #overview>p, #wizard p { color: var(--muted); font-size: 14px; }
+#batteryAlarm, #feedback { padding: 12px 15px; border-radius: 10px; }
+#batteryAlarm { background: #542c27; color: #ffd3c8; }
+#feedback { background: var(--surface); border-left: 3px solid var(--amber); }
+.telemetry { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-block: 1px solid var(--line); }
+.battery-icon { display: inline-block; position: relative; width: 26px; height: 13px; border: 1px solid var(--muted); border-radius: 3px; padding: 2px; }
+.battery-icon::before { content: ""; display: block; height: 100%; width: var(--charge,0%); background: var(--amber); }
+.battery-icon::after { content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; background: var(--muted); }
+#battery { font: 600 14px var(--mono); }
+.toolbar { position: sticky; top: 0; z-index: 2; background: var(--ground); display: flex; gap: 12px; justify-content: space-between; align-items: center; min-height: 45px; margin: 8px 0; }
+.status-slot { flex: 1; min-width: 0; }
+.status-slot #feedback { margin: 0; }
+body[data-page="drive"] .status-slot {
+  height: 44px; display: grid; align-items: center; overflow-y: auto;
+}
+body[data-page="drive"] .status-slot #feedback { padding: 4px 10px; font-size: 14px; }
+body[data-page="drive"] .status-slot.has-message #availability { display: none; }
+#availability, #stageStatus { font: 12px/1.4 var(--mono); color: var(--amber); }
+#stop, #padStop { color: #ffb5a9; border-color: #87554c; background: #432e2b; }
+#stop:active:not(:disabled), #padStop:active:not(:disabled) { background: #753e36; }
+#stop { min-width: 86px; }
+.drive-switch { display: flex; gap: 3px; margin: 8px 0; padding: 3px; background: var(--surface); border-radius: 12px; }
+.drive-switch button { flex: 1; min-height: 40px; padding: 4px; background: transparent; border: 0; color: var(--muted); }
+.drive-switch button[aria-pressed=true] { color: var(--ink); background: var(--line); }
+#progress:empty, #scanStatus:empty, #networkMessage:empty { display: none; }
+.drive-summary { display: contents; }
+#speedSetting .speed-readout, .accel-setting { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.speed-readout { font-size:14px; font-variant-numeric:tabular-nums; }
+#speedSetting input { width:100%; margin:4px 0; }
+.speed-presets { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.speed-presets button { min-height:32px; padding:3px; }
+.speed-presets button[aria-pressed=true] { color:var(--ground); background:var(--amber); }
+.accel-setting { margin:8px auto 0; max-width:330px; }
+
+body[data-page="drive"] .drive-summary {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px;
+  align-items: center; border-block: 1px solid var(--line);
+}
+body[data-page="drive"] .telemetry { border: 0; padding-block: 6px; gap: 8px; }
+body[data-page="drive"] #battery { font-size: 12px; }
+body[data-page="drive"] .toolbar { margin: 0; position: static; }
+body[data-page="drive"] .drive-summary:has(.has-message) .telemetry { display: none; }
+body[data-page="drive"] .drive-summary:has(.has-message) .toolbar { grid-column: 1 / -1; }
+body[data-page="drive"] #batteryAlarm { grid-column: 1 / -1; grid-row: 2; margin: 0 0 6px; }
+body[data-page="drive"] #speedSetting { margin-top: 8px; }
+.pad {
+  position: relative; isolation: isolate; container-type: inline-size;
+  width: min(100%, 330px, clamp(180px, calc(100dvh - 485px - env(safe-area-inset-bottom)), 330px)); aspect-ratio: 1; margin: 16px auto 0; border-radius: 50%;
+  background: repeating-conic-gradient(from -0.5deg, #767c77 0deg 1deg, transparent 1deg 6deg), var(--surface);
+  border: 6px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
+}
+.pad::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #151819; }
+.pad button { position: absolute; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad [data-dir] { inset: 4%; border: 0; padding: 0; border-radius: 50%; background: linear-gradient(155deg,#363c3d,#252a2b); clip-path: polygon(0 0,100% 0,60% 40%,40% 40%); }
+.pad [data-dir]:active:not(:disabled) { background: #715837; }
+.pad [data-dir]:focus-visible { background: #715837; }
+.pad [data-dir]:disabled { background: #232728; }
+.pad [data-dir="1,-1"] { transform: rotate(90deg); }
+.pad .down { transform: rotate(180deg); }
+.pad .left { transform: rotate(270deg); }
+.pad .key { position: absolute; inset: 4% 28% auto; height: 29%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: clamp(11px,4.5cqw,15px); }
+.pad .key::before { content: ""; border: solid var(--amber); border-width: 2px 2px 0 0; width: 9px; height: 9px; transform: rotate(-45deg); }
+.pad [data-dir="1,-1"] .key { transform: rotate(-90deg); }
+.pad [data-dir="1,-1"] .key::before { transform: rotate(45deg); }
+.pad .down .key { transform: rotate(180deg); }
+.pad .down .key::before { transform: rotate(135deg); }
+.pad .left .key { transform: rotate(90deg); }
+.pad .left .key::before { transform: rotate(225deg); }
+.pad #padStop { z-index: 1; inset: 34%; min-height: 0; padding: 0; display: grid; align-content: center; justify-items: center; gap: 6px; border-radius: 50%; font-size: 15px; box-shadow: 0 0 0 5px #151819; }
+#padStop::before { content: ""; width: 12px; height: 12px; border-radius: 2px; background: currentColor; }
+nav { display: flex; justify-content: center; gap: 6px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #1c2021; border-top: 1px solid var(--line); }
+nav button { flex: 1; max-width: 192px; display: grid; place-items: center; align-content: center; gap: 4px; border: 0; background: transparent; color: var(--muted); font-size: 12px; min-height: 48px; }
+nav button[aria-current=page] { color: var(--amber); background: #39332a; }
+.nav-icon { font: 20px/1 var(--mono); }
+details { margin-top: 23px; border-block: 1px solid var(--line); }
+summary { cursor: pointer; padding: 16px 0; font-size: 15px; font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; background: var(--line); margin-bottom: 15px; }
+.stats>span { background: var(--surface); padding: 12px; color: var(--muted); font-size: 12px; }
+.stats b { display: block; color: var(--ink); font: 15px/1.8 var(--mono); }
+.stages { display: grid; gap: 8px; }
+.stages button { text-align: left; padding: 16px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px; background: var(--surface); }
+.stages span { display: block; grid-column: 1; color: var(--muted); font: 12px var(--mono); }
+.stages button::after { content: "›"; grid-area: 1 / 2 / 3; font-size: 24px; color: var(--amber); }
+fieldset { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+legend { padding: 0 7px; font-weight: 700; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+.row, #mapping { display: grid; gap: 10px; }
+label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#actions label, #mapping label { justify-content: space-between; }
+#actions .row, #speedSetting { border-radius: 12px; padding: 15px; background: var(--surface); }
+#actions label:first-child, #actions label:nth-child(2) { display: grid; grid-template-columns: 1fr auto auto; }
+#actions label:first-child select { grid-column: 2 / 4; }
+input[type=number] { width: 6em; }
+input[type=range] { flex: 1; min-width: 80px; accent-color: var(--amber); }
+#wizard label { margin-block: 10px; }
+#execute:not(:disabled), #save:not(:disabled) { color: #221c13; background: var(--amber); border-color: transparent; }
+#lidar { margin-block: 16px; }
+@media (min-width: 700px) {
+  header { padding-top: 32px; }
+
+}
+@media (max-height: 580px) and (orientation: landscape) {
+  .pad { width: 210px; }
+  nav { padding-block: 4px; }
+  main { padding-bottom: 20px; }
+}
+.header-tools { display: flex; align-items: center; gap: 8px; }
+#settingsButton { min-height: 44px; padding: 4px 8px; background: transparent; font-size: 13px; }
+#settingsButton[aria-current="page"] { color: var(--amber); }
+#settings label { display: grid; margin: 14px 0; }
+#settings input { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--panel); color: var(--ink); }
+#settings a { color: var(--amber); }
+#settings dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; font-size: 14px; }
+#settings dd { margin: 0; }
+.settings-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.settings-tabs button[aria-pressed="true"] { background: var(--amber); color: var(--ground); }
+#nearby { display: grid; gap: 4px; }
+#nearby button { text-align: left; overflow-wrap: anywhere; }
+#nearby button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { display: none; }
+@media (max-width: 370px) { .header-tools { gap: 3px; } #connection { font-size: 10px; } }
+  </style>
+  <header>
+    <h1><span class="mark" aria-hidden="true"></span>Rover Console</h1>
+    <div class="header-tools"><output id="connection">Connecting…</output><button id="settingsButton" data-page="settings">Settings</button></div>
+  </header>
+  <main>
+    <div class="drive-summary">
+    <div class="telemetry"><span class="battery-icon" aria-hidden="true"></span><strong id="battery">Battery level unknown</strong></div>
+    <p role="alert" id="batteryAlarm" hidden>Low battery. Stop and recharge.</p>
+
+    <div class="toolbar"><div class="status-slot">
+      <output id="availability"></output><p id="feedback" role="status"></p>
+    </div><button id="stop" disabled>Stop</button></div>
+    </div>
+
+    <section id="drive" aria-label="Drive">
+      <div class="drive-switch" role="group" aria-label="Drive mode">
+        <button data-drive-panel="manual" aria-controls="manual" aria-pressed="true">Directional pad</button>
+        <button data-drive-panel="actions" aria-controls="actions" aria-pressed="false">Precision</button>
+      </div>
+      <div id="manual">
+      <div id="speedSetting">
+        <div class="speed-readout"><label for="speed">Target <output id="speedOut">0.40</output></label>
+          <span>Actual <output id="actualSpeed">—</output> m/s</span></div>
+        <input aria-label="Target speed in metres per second" id="speed" type="range" min="0.02" max="1.07" step="0.01" value="0.40">
+        <div class="speed-presets" aria-label="Speed presets in metres per second">
+          <button data-speed="0.2">0.2</button><button data-speed="0.4">0.4</button>
+          <button data-speed="0.6">0.6</button><button data-speed="0.8">0.8</button>
+        </div>
+      </div>
+      <div class="pad">
+        <button class="up" data-dir="1,1" disabled><span class="key">Forward</span></button
+        ><button class="left" data-dir="-1,1" disabled><span class="key">Left</span></button
+        ><button id="padStop" disabled>Stop</button
+        ><button data-dir="1,-1" disabled><span class="key">Right</span></button
+        ><button class="down" data-dir="-1,-1" disabled><span class="key">Reverse</span></button>
+      </div>
+      <label class="accel-setting">Acceleration <select id="acceleration">
+        <option value="smooth">Smooth</option><option value="responsive" selected>Responsive</option>
+      </select></label>
+      </div>
+    <div id="actions" hidden>
+      <div class="row">
+        <label
+          >Direction<select id="actionType">
+            <option value="forward">Forward</option>
+            <option value="reverse">Reverse</option>
+            <option value="left">Turn left</option>
+            <option value="right">Turn right</option>
+          </select></label
+        >
+        <label
+          ><span id="targetLabel">Distance</span><input
+            type="number"
+            id="amount"
+            min="0.001" max="3" required inputmode="decimal"
+            step="any"
+            value="0.5"
+          /><span id="unit">m</span></label
+        >
+        <button id="execute" disabled>Run</button>
+      </div>
+      <p id="progress" class="note" role="status"></p>
+      </div>
+    </section>
+    <section id="settings" hidden>
+      <h2>Settings</h2>
+      <div class="settings-tabs" role="group" aria-label="Settings panels">
+        <button data-panel="wifiPanel" aria-controls="wifiPanel" aria-pressed="true">Wi-Fi</button>
+        <button data-panel="recoveryPanel" aria-controls="recoveryPanel" aria-pressed="false">Hotspot recovery</button>
+      </div>
+      <div id="wifiPanel">
+      <p id="networkStatus" role="status">Connecting…</p>
+      <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
+      <fieldset id="networkSetup" disabled>
+        <legend>Home network</legend>
+        <button id="scanWifi">Scan networks</button>
+        <p id="scanStatus" role="status"></p>
+        <div id="nearby" role="group" aria-label="Nearby networks"></div>
+        <label>2.4 GHz network<input id="homeName" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+        <label>Password<input type="password" id="homePass" maxlength="64" autocomplete="off"></label>
+        <button id="testWifi">Test &amp; save</button>
+        <button id="forgetWifi">Forget network</button>
+      </fieldset>
+      <p id="networkMessage" role="status"></p>
+      </div>
+      <div id="recoveryPanel" hidden>
+        <dl><dt>Blue</dt><dd>Hotspot ready</dd><dt>Amber pulse</dt><dd>Scanning or connecting</dd>
+        <dt>Green</dt><dd>Connected to home Wi-Fi</dd><dt>Red pulse</dt><dd>Network setup failed</dd>
+        <dt>Purple pulse</dt><dd>Keep holding BOOT</dd></dl>
+        <p>Hold BOOT for 5 seconds to stop and reopen the hotspot.</p>
+      </div>
+    </section>
+    <section id="lidar" hidden>
+      <h2>Lidar clearance</h2>
+      <p id="sectors"></p>
+    </section>
+    <section id="cal" hidden>
+      <h2>Chassis calibration</h2>
+      <div id="trialResult" hidden>
+        <p id="trialOutcome" role="status"></p>
+        <button id="trialBack">Back to calibration</button>
+      </div>
+      <div id="overview">
+        <p>Choose a setting. Each can be saved separately and resumed after reconnecting.</p>
+        <div class="stages">
+          <button data-stage="mapping">Wheel directions<span id="mappingState">Loading…</span></button>
+          <button data-stage="distance">Distance<span id="distanceState">Loading…</span></button>
+          <button data-stage="turn">Turn angle<span id="turnState">Loading…</span></button>
+        </div>
+        <p id="params" class="note"></p>
+      </div>
+      <fieldset id="wizard" hidden disabled>
+        <legend id="stageTitle"></legend>
+        <p id="stageStatus" role="status"></p>
+        <div id="mappingForm">
+          <p>Lift the wheels and jog each one. The top of the tire moves toward the front when rolling forward. Turn each wheel forward by hand. Choose +1 if its count rises, or −1 if it falls.</p>
+          <p id="jogTicks"></p>
+        <button data-jog="3">Jog M3</button>
+        <button data-jog="4">Jog M4</button>
+        <div id="mapping">
+          <label
+            >Left wheel<select id="leftChannel">
+              <option value="3">M3</option>
+              <option value="4">M4</option>
+            </select></label
+          >
+        </div>
+        <p>Saving a changed channel or direction clears the distance and turn calibrations.</p>
+        </div>
+        <div id="sampleForm">
+          <p id="instructions"></p>
+          <button id="startSample">Start sampling</button>
+          <button id="spin" hidden>Jog left</button>
+          <label><span id="measureLabel"></span><input id="measure" type="number" step="any"><span id="measureUnit"></span></label>
+          <button id="calculate">Finish and calculate</button>
+          <hr>
+          <label><span id="trialLabel"></span><input id="trialAmount" type="number" min="1" step="any"><span id="trialUnit"></span></label>
+          <button id="trial">Test movement</button>
+          <p class="note">This test drives the wheels. Put the rover on the ground, leave room for it to move, and check the actual movement before saving.</p>
+        </div>
+        <div class="row"><button id="save">Save</button><button id="cancel">Discard and return</button></div>
+      </fieldset>
+    </section>
+    <details id="vehicleTelemetry"><summary>Vehicle telemetry</summary>
+      <div class="stats">
+        <span>Motor driver<b id="driver">—</b></span
+        ><span>Control owner<b id="owner">—</b></span>
+        <span>M3 encoder<b id="m3">—</b></span
+        ><span>M4 encoder<b id="m4">—</b></span>
+        <span>Target L / R (ticks/s)<b id="wheelTarget">—</b></span>
+        <span>Measured L / R (ticks/s)<b id="wheelRate">—</b></span>
+        <span>Sent PWM L / R<b id="wheelPwm">—</b></span>
+        <span>Wheel status<b id="still">—</b></span
+        ><span>Feedback age<b id="age">—</b></span>
+      </div>
+      <button id="exportRun" disabled>Download last drive CSV</button>
+    </details>
+  </main>
+    <nav aria-label="Console"><button data-page="drive" aria-current="page"><span class="nav-icon" aria-hidden="true">◎</span>Drive</button><button data-page="cal"><span class="nav-icon" aria-hidden="true">☷</span>Calibration</button></nav>
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const pending = new Map();
+    let ws,
+      session = 0,
+      id = 0,
+      lease = 0,
+      windowId = 0,
+      mode = "",
+      held = null,
+      generation = 0,
+      last = {},
+      busy = false;
+    let pointer = null, acceptedAt = null, manualInFlight = null, lastDriveAt = 0;
+    let queryPending = false,
+      lastSample = 0;
+    let page = "drive", drivePanel = "manual", stage = "", samplingNow = false;
+    const titles = {mapping:"Wheel directions", distance:"Distance", turn:"Turn angle"};
+    const savedParams = () => last.saved_calibration || last.calibration;
+    function stageState(c, key) {
+      if (!c) return "Loading…";
+      if (key === "mapping") return c.mapped ? (c.revision ? "Saved" : "Chassis default") : "Not calibrated";
+      const turn = key === "turn";
+      if (!(turn ? c.track_mm : c.left_mm_tick)) return "Not calibrated";
+      return c.checks & (turn ? 2 : 1) ? "Saved · verified" : "Saved · test needed";
+    }
+    const traceKeys = ["boot_id","t_ms","rate_at_ms","rate_window_ms","feedback_age_ms","left_ticks","right_ticks",
+      "left_target_ticks_s","right_target_ticks_s","left_ticks_s","right_ticks_s","left_pwm","right_pwm"];
+    let trace = [], recording = false, traceBoot;
+    function logDrive(m) {
+      if (traceBoot !== m.boot_id) recording = false;
+      traceBoot = m.boot_id;
+      if (!recording && (m.left_pwm || m.right_pwm || m.left_target_ticks_s || m.right_target_ticks_s)) {
+        trace = [];
+        recording = true;
+      }
+      if (!recording) return;
+      trace.push(traceKeys.map(k => m[k] ?? "").join(","));
+      if (trace.length > 3000) trace.shift();
+      $("exportRun").disabled = false;
+      if (m.settled && !m.left_pwm && !m.right_pwm) recording = false;
+    }
+    $("exportRun").onclick = () => {
+      const url = URL.createObjectURL(new Blob([[traceKeys.join(","), ...trace].join("\n")], {type:"text/csv"}));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "wheel-trace.csv";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    // 67.5 mm tire circumference divided by the measured counts per wheel revolution.
+    const nominalScales = [Math.PI * 67.5 / 1784, Math.PI * 67.5 / 1782];
+    const nominalMean = (nominalScales[0] + nominalScales[1]) / 2;
+    const presets = [...document.querySelectorAll("[data-speed]")];
+    let speedLimits = {}, rateStamp, smoothedSpeed;
+    function showTarget() {
+      const v = Number($("speed").value);
+      $("speedOut").textContent = v.toFixed(2);
+      for (const button of presets) {
+        button.disabled = Number(button.dataset.speed) > Number($("speed").max);
+        button.setAttribute("aria-pressed", Number(button.dataset.speed) === v);
+      }
+    }
+    function showActual(ready) {
+      if (!ready || !last.rate_window_ms || !Number.isFinite(last.left_ticks_s) ||
+          !Number.isFinite(last.right_ticks_s) || last.feedback_age_ms >= 300) {
+        $("actualSpeed").textContent = "—";
+        smoothedSpeed = rateStamp = undefined;
+        return;
+      }
+      if (last.rate_at_ms !== rateStamp) {
+        const scales = last.distance_ready
+          ? [last.calibration.left_mm_tick, last.calibration.right_mm_tick] : nominalScales;
+        const measured = Math.abs(last.left_ticks_s * scales[0] + last.right_ticks_s * scales[1]) / 2000;
+        const elapsed = (last.rate_at_ms - rateStamp) >>> 0;
+        const weight = smoothedSpeed === undefined || elapsed > 1000 ? 1 : 1 - Math.exp(-elapsed / 300);
+        smoothedSpeed = last.settled ? 0 : (smoothedSpeed ?? 0) + weight * (measured - (smoothedSpeed ?? 0));
+        rateStamp = last.rate_at_ms;
+      }
+      $("actualSpeed").textContent = "≈" + smoothedSpeed.toFixed(2);
+    }
+    let feedbackTimer;
+    function say(message) {
+      clearTimeout(feedbackTimer);
+      $("feedback").textContent = message;
+      $("feedback").parentElement.classList.toggle("has-message", !!message);
+      if (page === "drive" && message) feedbackTimer = setTimeout(() => say(""), 4500);
+    }
+    let trialStage = "";
+    function trialInterrupted(reason, state) {
+      if (!trialStage) return;
+      const messages = {overshoot:"Outside target tolerance", timeout:"Control timed out",
+        wheel_stalled:"Wheel stalled", feedback_lost:"Motor feedback lost", ENCODER_RESET:"Encoder reset",
+        STALE_WINDOW:"Connection delayed", NOT_OWNER:"Control ended", UART_TX:"Motor link failed",
+        lidar_interlock:"Obstacle detected", action_timeout:"Movement timed out"};
+      let detail = messages[reason] || reason || "Control ended";
+      if (reason === "overshoot" && Number.isFinite(state?.left_progress_mm) && Number.isFinite(state?.right_progress_mm))
+        detail += " · L " + Math.round(state.left_progress_mm) + " / " + Math.round(state.left_goal_mm) +
+          " mm · R " + Math.round(state.right_progress_mm) + " / " + Math.round(state.right_goal_mm) + " mm";
+      $("trialOutcome").textContent = titles[trialStage] + " test · " + detail + ". Result not saved.";
+      $("trialResult").hidden = false;
+    }
+    $("trialBack").onclick = () => { $("trialResult").hidden = true; render(); };
+    function clearLocal() {
+      trialStage = "";
+      lease = 0;
+      windowId = 0;
+      mode = "";
+      stage = "";
+      samplingNow = false;
+      held = pointer = acceptedAt = null;
+      generation++;
+    }
+    function call(op, fields = {}) {
+      if (!ws || ws.readyState !== 1 || (!session && op !== "hello"))
+        return Promise.reject(Error("Disconnected"));
+      const n = ++id,
+        packet = { v: 1, id: n, op, ...fields };
+      if (session) packet.session = session;
+      if (lease) {
+        packet.lease ??= lease;
+        packet.window ??= windowId;
+      }
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(n);
+          reject(Error("Response timed out"));
+        }, op.startsWith("wifi_") ? 3000 : 700);
+        pending.set(n, { resolve, reject, timer });
+        ws.send(JSON.stringify(packet));
+      });
+    }
+    async function guarded(fn) {
+      try {
+        await fn();
+      } catch (e) {
+        const errors = {BAD_SAMPLE:"Invalid sample. Check that both wheels turned in the expected directions and sample again.",
+          MODE:"Wait for the wheels to stop and try again.", NOT_READY:"Check the sampling step and wait for the wheels to stop.",
+          NO_FEEDBACK:"Motor feedback lost", BUSY:ownerMessage(e.owner || last.owner) || "Please wait for the wheels to stop", RANGE:"Value out of range",
+          STALE_WINDOW:"Connection delayed. Press again.", NOT_OWNER:"Control ended. Press again.",
+          CAL_REQUIRED:"Complete the required calibration first", SCALE_REQUIRED:"Save distance calibration first"};
+        say(errors[e.message] || e.message);
+      }
+    }
+    function ownerMessage(owner) {
+      return owner === "usb" ? "USB host is driving" : owner === "wifi" ? "Another Wi-Fi client has control" : "";
+    }
+    const dirs = [...document.querySelectorAll("[data-dir]")];
+    function render() {
+      document.body.dataset.page = page;
+      const ready = !!session && last.driver_online,
+        free = last.owner === "free";
+      const batteryFresh = session && last.battery_valid && Number.isFinite(last.battery_v) &&
+        (!lastSample || Date.now() - lastSample <= 1000);
+      $("battery").textContent = batteryFresh ?
+        last.battery_v.toFixed(2) + " V · ≈" + last.battery_percent + "%" : "Battery level unknown";
+      $("batteryAlarm").hidden = !(batteryFresh && last.battery_low);
+      document.body.dataset.connected = String(!!session);
+      document.documentElement.style.setProperty("--charge", batteryFresh ? last.battery_percent + "%" : "0%");
+      $("padStop").disabled = $("stop").disabled = !session;
+      const precision = drivePanel === "actions";
+      $("stop").hidden = page === "drive" && !precision;
+      for (const button of driveButtons) {
+        const selected = drivePanel === button.dataset.drivePanel;
+        $(button.dataset.drivePanel).hidden = !selected;
+        button.setAttribute("aria-pressed", String(selected));
+        button.disabled = !selected && (!!lease || !!held || busy);
+      }
+      const turning = ["left","right"].includes($("actionType").value);
+      const actionReady = turning ? last.calibrated : last.distance_ready;
+      $("speedSetting").hidden = !last.manual_ready;
+      if (session && last.manual_ready) {
+        const maxMm = last.distance_ready ? last.manual_max_mm_s : speedLimits.basic_ticks_max * nominalMean;
+        const slider = $("speed");
+        slider.min = last.distance_ready ? Math.min(0.01, maxMm / 1000) : 0.02;
+        slider.max = Math.max(Number(slider.min), Math.floor(maxMm / 10) / 100);
+        showTarget();
+      }
+      showActual(ready && (!lastSample || Date.now() - lastSample < 1000));
+      for (const b of dirs)
+        b.disabled = !(
+          ready &&
+          last.manual_ready &&
+          (!ownerMessage(last.owner) && !busy && (!mode || mode === "manual" || mode === "claim"))
+        );
+      $("execute").disabled = !(
+        ready &&
+        actionReady &&
+        free &&
+        last.settled &&
+        !busy
+      );
+      const saved = savedParams();
+      for (const tab of document.querySelectorAll("button[data-page]")) {
+        const selected = tab.dataset.page === page;
+        $(tab.dataset.page).hidden = !selected;
+        tab.setAttribute("aria-current", selected ? "page" : "false");
+        tab.disabled = !selected && (!!lease || !!held || busy);
+      }
+      $("availability").textContent = !session ? "Waiting for connection" : !ready ? "Motor driver offline" :
+        page === "settings" ? "Network settings" : stage ? titles[stage] : ownerMessage(last.owner) ? ownerMessage(last.owner) :
+        mode === "manual" ? "Driving" : mode === "claim" ? "Getting ready" : last.owner === "self" ? "This device has control" : !last.settled ? "Waiting for wheels to stop" :
+        page === "drive" && precision && !actionReady ? (turning ? "Verify distance and angle calibration" : "Verify distance calibration") :
+        last.manual_ready ? "Ready to drive" : "Set wheel directions first";
+      $("overview").hidden = !!stage || !$("trialResult").hidden;
+      $("wizard").hidden = !stage;
+      $("wizard").disabled = mode !== "cal" || busy;
+      for (const button of document.querySelectorAll("[data-stage]")) {
+        const key = button.dataset.stage;
+        const missing = key === "distance" && !saved?.mapped ? "Save wheel directions first" :
+          key === "turn" && !saved?.left_mm_tick ? "Save distance first" : "";
+        $(key+"State").textContent = missing || stageState(saved,key);
+        button.disabled = !!missing || !ready || !free || !last.settled || busy;
+      }
+      if (stage) {
+        const c = last.calibration;
+        const active = last.action_state === "running";
+        const available = stage === "turn" ? c?.track_mm > 0 : c?.left_mm_tick > 0;
+        $("startSample").disabled = samplingNow || active || !last.settled;
+        $("calculate").disabled = !samplingNow || !last.settled;
+        $("spin").disabled = !samplingNow;
+        $("trial").disabled = !available || samplingNow || active || !last.settled;
+        $("save").disabled = (stage !== "mapping" && !available) || samplingNow || active || !last.settled;
+        $("jogTicks").textContent = "M3 ticks " + last.m3_ticks + " · M4 ticks " + last.m4_ticks;
+        $("stageStatus").textContent = samplingNow ? "Sampling" : active ? "Test in progress" :
+          stage === "mapping" ? "Save to apply these directions" : last.action_state === "failed" && last.reason !== "ready" ? "Test failed · " + last.reason : !available ? "Ready to sample" :
+          c.checks & (stage === "turn" ? 2 : 1) ? "Test passed. Ready to save." : "Save these values or run a test.";
+      }
+      $("owner").textContent =
+        { free: "Available", self: "This browser", usb: "USB host", wifi: "Another Wi-Fi client" }[
+          last.owner
+        ] || "—";
+      $("driver").textContent = ready ? "Online" : "No feedback";
+      $("still").textContent = last.settled
+        ? "Stopped"
+        : ready
+          ? "Moving or stopping"
+          : "Unknown";
+      $("wheelTarget").textContent = ready ? [last.left_target_ticks_s,last.right_target_ticks_s].join(" / ") : "—";
+      $("wheelRate").textContent = ready && last.rate_window_ms ? [last.left_ticks_s,last.right_ticks_s].join(" / ") : "—";
+      $("wheelPwm").textContent = ready ? [last.left_pwm,last.right_pwm].join(" / ") : "—";
+      $("m3").textContent = last.m3_ticks ?? "—";
+      $("m4").textContent = last.m4_ticks ?? "—";
+      $("age").textContent = ready ? last.feedback_age_ms + " ms" : "—";
+      const c = last.calibration;
+      if (c)
+        $("params").textContent =
+          "Revision " +
+          c.revision +
+          " · left/right " +
+          Number(c.left_mm_tick).toFixed(3) +
+          " / " +
+          Number(c.right_mm_tick).toFixed(3) +
+          " mm/ticks · track width " +
+          Number(c.track_mm).toFixed(1) +
+          " mm";
+      const progress = last.action_id ? "Movement · " + last.action_state : "";
+      if ($("progress").textContent !== progress) $("progress").textContent = progress;
+    }
+    function connect() {
+      ws = new WebSocket("ws://" + location.host + "/ws");
+      ws.onopen = () =>
+        guarded(async () => {
+          const h = await call("hello");
+          session = h.session;
+          speedLimits = h;
+          rateStamp = smoothedSpeed = undefined;
+          $("connection").textContent = "Connected";
+          last = await call("status");
+          render();
+          await call("subscribe", { topic: "encoders", hz: 5 });
+          $("lidar").hidden = !h.capabilities.includes("lidar_sectors");
+          if (!$("lidar").hidden)
+            await call("subscribe", { topic: "lidar_sectors", hz: 5 });
+        });
+      ws.onmessage = (e) => {
+        let m;
+        try {
+          m = JSON.parse(e.data);
+        } catch {
+          return;
+        }
+        if (m.event === "lidar_sectors") {
+          $("sectors").textContent = m.sectors
+            .map(
+              (s, i) =>
+                ["Front", "Left", "Rear", "Right"][i] +
+                " " +
+                (s.valid ? s.min_mm + " mm" : "Unknown"),
+            )
+            .join(" · ");
+          return;
+        }
+        if (m.event === "control_window") {
+          if (lease && m.lease === lease) {
+            windowId = m.window;
+            if (mode === "manual") serviceManual();
+          }
+          return;
+        }
+        if (["encoders", "action", "status"].includes(m.event)) {
+          if (lease && acceptedAt !== null && ((m.t_ms - acceptedAt) | 0) < 0) return;
+          if (m.event === "encoders") logDrive(m);
+          last = m;
+          lastSample = Date.now();
+          if (lease && m.owner !== "self") {
+            trialInterrupted(m.reason, m);
+            const manual = mode === "manual";
+            clearLocal();
+            const reason = {timeout:"Connection paused. Press again.", feedback_lost:"Motor feedback lost",
+              wheel_stalled:"Wheel stalled", lidar_interlock:"Obstacle detected", deadline:"Controller stopped. Press again."};
+            say(ownerMessage(m.owner) || reason[m.reason] || (manual ? "Drive stopped. Press again." : "Control released"));
+          }
+          if (m.reason === "saved") say("Calibration saved");
+          if (m.reason === "save_failed") say("Save failed. Previous settings retained.");
+          render();
+          return;
+        }
+        const p = pending.get(m.id);
+        if (!p) return;
+        clearTimeout(p.timer);
+        pending.delete(m.id);
+        if (m.ok) p.resolve(m);
+        else p.reject(Object.assign(Error(m.error || "Request failed"), {owner:m.owner, window:m.window, lease:m.lease}));
+      };
+      ws.onclose = () => {
+        for (const p of pending.values()) {
+          clearTimeout(p.timer);
+          p.reject(Error("Connection lost"));
+        }
+        pending.clear();
+        trialInterrupted("Disconnected");
+        session = 0;
+        $("networkSetup").disabled = true;
+        clearLocal();
+        last = {};
+        busy = false;
+        lastSample = 0;
+        $("sectors").textContent = "Data stale";
+        render();
+        $("connection").textContent = "Disconnected";
+        setTimeout(connect, 1200);
+      };
+    }
+    async function acquire(kind, token) {
+      const r = await call(kind === "cal" ? "cal_begin" : "claim");
+      if (token !== generation) {
+        await releaseLease(r.lease);
+        return false;
+      }
+      acceptedAt = r.accepted_ms ?? null;
+      lease = r.lease;
+      windowId = r.window;
+      mode = kind;
+      return true;
+    }
+    async function stop() {
+      trialInterrupted("Stopped");
+      clearLocal();
+      render();
+      if (session) {
+        await call("stop");
+        say("Stop requested");
+      }
+    }
+    async function releaseLease(previous) {
+      try { await call("release", {lease:previous}); }
+      catch (e) { if (e.message !== "NOT_OWNER") throw e; }
+    }
+    async function releaseMine() {
+      const previous = lease;
+      clearLocal();
+      render();
+      if (session && previous) await releaseLease(previous);
+    }
+    function release(e) {
+      if (e.pointerId === pointer) guarded(releaseMine);
+    }
+    async function beginManual(token) {
+      const deadline = performance.now() + 800;
+      while (token === generation && held) {
+        try {
+          if (await acquire("manual", token)) {
+            say("");
+            render();
+            await serviceManual();
+          }
+          return;
+        } catch (e) {
+          if (token !== generation) return;
+          // A quick direction change can arrive while the previous press is settling.
+          if (["BUSY","NOT_READY"].includes(e.message) && !ownerMessage(e.owner) &&
+              performance.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 70));
+            continue;
+          }
+          clearLocal();
+          render();
+          throw e;
+        }
+      }
+    }
+    async function serviceManual() {
+      if (!lease || mode !== "manual" || !held || manualInFlight === generation) return;
+      const token = generation, activeLease = lease;
+      manualInFlight = token;
+      try {
+        lastDriveAt = performance.now();
+        try { await drive(); }
+        catch (e) {
+          if (token !== generation) return;
+          if (e.message !== "STALE_WINDOW" || !e.window || e.lease !== activeLease) throw e;
+          windowId = e.window;
+          await drive();
+        }
+      } catch (e) {
+        if (token !== generation) return;
+        const message = {NOT_OWNER:"Drive stopped. Press again.", STALE_WINDOW:"Connection delayed. Press again.",
+          NO_FEEDBACK:"Motor feedback lost"};
+        say(ownerMessage(e.owner) || message[e.message] || e.message);
+        await guarded(releaseMine);
+      } finally {
+        if (manualInFlight === token) manualInFlight = null;
+      }
+    }
+    dirs.forEach((b) => {
+      b.onpointerdown = (e) => guarded(async () => {
+        if (held || busy || lease || !e.isPrimary) return;
+        pointer = e.pointerId;
+        held = b.dataset.dir.split(",").map(Number);
+        mode = "claim";
+        const token = ++generation;
+        b.setPointerCapture(pointer);
+        render();
+        await beginManual(token);
+      });
+      b.onpointerup = release;
+      b.onpointercancel = release;
+      b.onlostpointercapture = release;
+    });
+    async function drive() {
+      if (held) {
+        const mmPerSecond = Math.round(Number($("speed").value) * 1000);
+        const acceleration = $("acceleration").value;
+        if (!last.distance_ready) {
+          await call("drive_low", {left_dir: held[0], right_dir: held[1],
+            ticks_s: Math.round(mmPerSecond / nominalMean), acceleration});
+          return;
+        }
+        let v = mmPerSecond;
+        await call("drive", {
+          left_mm_s: v * held[0],
+          right_mm_s: v * held[1], acceleration,
+        });
+      }
+    }
+    function disengage() {
+      if (mode || lease || held || busy) {
+        trialInterrupted("Page left or hidden");
+        guarded(releaseMine);
+      }
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) disengage();
+    });
+    window.addEventListener("blur", disengage);
+    $("padStop").onclick = $("stop").onclick = () => guarded(stop);
+    $("speed").oninput = showTarget;
+    for (const button of presets) button.onclick = () => {
+      $("speed").value = button.dataset.speed;
+      showTarget();
+    };
+    const driveButtons = [...document.querySelectorAll("[data-drive-panel]")];
+    for (const button of driveButtons) button.onclick = () => {
+      if (busy || lease || held) return;
+      drivePanel = button.dataset.drivePanel;
+      say("");
+      render();
+    };
+    const targets = { distance: "0.5", angle: "90" };
+    let targetKind = "distance";
+    $("actionType").onchange = () => {
+      targets[targetKind] = $("amount").value;
+      const turn = ["left", "right"].includes($("actionType").value);
+      targetKind = turn ? "angle" : "distance";
+      $("targetLabel").textContent = turn ? "Angle" : "Distance";
+      $("unit").textContent = turn ? "°" : "m";
+      $("amount").min = turn ? "1" : "0.001";
+      $("amount").max = turn ? "360" : "3";
+      $("amount").value = targets[targetKind];
+      render();
+    };
+    function goal() {
+      const kind = $("actionType").value,
+        turn = ["left", "right"].includes(kind);
+      const magnitude = Number($("amount").value);
+      if (
+        !Number.isFinite(magnitude) ||
+        magnitude < (turn ? 1 : 0.001) ||
+        magnitude > (turn ? 360 : 3)
+      )
+        throw Error(turn ? "Enter 1–360°" : "Enter 0.001–3 m");
+      return {
+        turn,
+        [turn ? "angle_deg" : "distance_mm"]:
+          magnitude *
+          (turn ? 1 : 1000) *
+          (["reverse", "right"].includes(kind) ? -1 : 1),
+        request_key: session + "-" + id + "-" + Date.now(),
+      };
+    }
+    $("execute").onclick = () =>
+      guarded(async () => {
+        if (busy || lease) return;
+        const g = goal(),
+          token = ++generation;
+        busy = true;
+        try {
+          if (await acquire("action", token))
+            await call(g.turn ? "turn_angle" : "move_distance", g);
+        } catch (e) {
+          if (lease) await releaseMine();
+          throw e;
+        } finally {
+          busy = false;
+          render();
+        }
+      });
+    let wifiPoll = false, wifiRequest = false, wifiError = "";
+    const panelButtons = [...document.querySelectorAll("button[data-panel]")];
+    for (const button of panelButtons) button.onclick = () => {
+      for (const other of panelButtons) {
+        $(other.dataset.panel).hidden = other !== button;
+        other.setAttribute("aria-pressed", String(other === button));
+      }
+    };
+    function highlightNetwork() {
+      for (const button of $("nearby").children)
+        button.setAttribute("aria-pressed", String(button.textContent === $("homeName").value));
+    }
+    $("homeName").oninput = highlightNetwork;
+    function presentNetworks(names) {
+      const list = $("nearby");
+      if (names.length === list.children.length &&
+          names.every((name, i) => list.children[i].textContent === name)) return;
+      list.replaceChildren(...names.map(name => {
+        const button = document.createElement("button");
+        button.textContent = name;
+        button.onclick = () => {
+          if ($("homeName").value !== name) $("homePass").value = "";
+          $("homeName").value = name;
+          highlightNetwork();
+          $("homePass").focus();
+        };
+        return button;
+      }));
+      highlightNetwork();
+    }
+    async function refreshWifi() {
+      if (wifiPoll || wifiRequest || page !== "settings" || !session) return;
+      wifiPoll = true;
+      try {
+        const net = await call("wifi_status");
+        if (wifiRequest) return;
+        const occupied = last.owner !== "free";
+        $("networkSetup").disabled = net.busy || !net.setup_allowed || occupied;
+        $("networkStatus").textContent = (net.home_ip ? "Connected to " + net.home_ssid :
+          net.home_ssid ? "Saved network: " + net.home_ssid : "No saved network") +
+          (net.hotspot_on ? " · Hotspot: " + net.hotspot : "");
+        $("networkAddress").hidden = !net.home_ip;
+        $("homeLink").href = net.home_ip ? "http://" + net.home_ip + "/" : "";
+        $("homeLink").textContent = net.home_ip;
+        $("forgetWifi").disabled = !net.home_ssid;
+        $("networkMessage").textContent = !net.setup_allowed ?
+          "Connect to the rover hotspot to change Wi-Fi settings." : occupied ?
+          "Finish driving or calibration first." : wifiError || (net.scan_state === "running" ? "" : net.message);
+        const names = net.networks || [];
+        presentNetworks(names);
+        $("scanWifi").textContent = net.scan_state === "running" ? "Scanning…" : "Scan networks";
+        $("scanStatus").textContent = net.scan_state === "running" ? "" :
+          net.scan_state === "failed" ? "Scan failed. Retry or enter a name." :
+          names.length ? names.length + (names.length === 1 ? " network found." : " networks found.") :
+          net.scan_state === "done" ? "No networks found." :
+          "";
+      } catch (e) {
+        $("networkSetup").disabled = true;
+        $("networkStatus").textContent = e.message + ". Reconnecting…";
+      } finally { wifiPoll = false; }
+    }
+    async function changeWifi(op,fields={}) {
+      wifiRequest = true;
+      wifiError = "";
+      $("networkSetup").disabled = true;
+      if (op === "wifi_scan") {
+        $("scanWifi").textContent = "Scanning…";
+        $("scanStatus").textContent = "";
+      }
+      try {
+        await call(op,fields);
+        if (op === "wifi_test") $("homePass").value = "";
+      } catch (e) {
+        wifiError = e.message === "BUSY" ? "The rover is busy. Try again shortly." : "Request failed: " + e.message;
+        $("networkMessage").textContent = wifiError;
+      } finally { wifiRequest = false; await refreshWifi(); }
+    }
+    $("scanWifi").onclick = () => changeWifi("wifi_scan");
+    $("testWifi").onclick = () => {
+      if (!$("homeName").value) { $("homeName").focus(); $("homeName").reportValidity(); return; }
+      return changeWifi("wifi_test",{ssid:$("homeName").value,password:$("homePass").value});
+    };
+    $("forgetWifi").onclick = () => {
+      if (window.confirm("Forget the saved home network?")) changeWifi("wifi_forget");
+    };
+    setInterval(refreshWifi, 1000);
+    for (const tab of document.querySelectorAll("button[data-page]"))
+      tab.onclick = () => { page = tab.dataset.page; say(""); render(); document.querySelector("main").scrollTop = 0; if (page === "settings") refreshWifi(); };
+    for (const button of document.querySelectorAll("[data-stage]")) {
+      button.onclick = () => guarded(async () => {
+        if (busy || lease) return;
+        busy = true;
+        render();
+        try {
+          if (!await acquire("cal", ++generation)) return;
+          stage = button.dataset.stage;
+          const c = savedParams();
+          $("stageTitle").textContent = titles[stage];
+          $("mappingForm").hidden = stage !== "mapping";
+          $("sampleForm").hidden = stage === "mapping";
+          $("leftChannel").value = c.left_channel;
+          for (const k of ["left_motor_sign","right_motor_sign","left_encoder_sign","right_encoder_sign"])
+            $(k).value = c[k] || 1;
+          const turn = stage === "turn";
+          $("spin").hidden = !turn;
+          $("instructions").textContent = turn ?
+            "Put the rover on the ground and mark its heading. Start sampling, hold Jog left, then enter the measured angle. Left turns are positive." :
+            "Lift both wheels. Start sampling and turn each wheel one full revolution forward. For 67.5 mm tires, enter 212 mm. After recalculating distance, repeat the turn test.";
+          $("measureLabel").textContent = turn ? "Measured angle" : "Measured distance";
+          $("measureUnit").textContent = $("trialUnit").textContent = turn ? "deg" : "mm";
+          $("measure").value = turn ? 90 : 212;
+          $("trialLabel").textContent = turn ? "Left turn target" : "Forward target";
+          $("trialAmount").value = turn ? 90 : 200;
+          $("save").textContent = "Save " + titles[stage];
+          say("");
+        } finally { busy = false; render(); }
+      });
+    }
+    $("cancel").onclick = () =>
+      guarded(async () => {
+        trialStage = "";
+      await call("cal_cancel");
+        clearLocal();
+        render();
+      });
+    function sample(step, fields = {}) {
+      return call("cal_sample", { step, ...fields });
+    }
+    for (const [key, label] of [
+      ["left_motor_sign", "Left motor"],
+      ["right_motor_sign", "Right motor"],
+      ["left_encoder_sign", "Left encoder"],
+      ["right_encoder_sign", "Right encoder"],
+    ]) {
+      const lab = document.createElement("label"),
+        select = document.createElement("select");
+      lab.textContent = label;
+      select.id = key;
+      select.add(new Option("Normal +1", "1"));
+      select.add(new Option("Reversed −1", "-1"));
+      lab.append(select);
+      $("mapping").append(lab);
+    }
+    function jogButton(b, channel, spin) {
+      b.onpointerdown = (e) =>
+        guarded(async () => {
+          b.setPointerCapture(e.pointerId);
+          await sample("jog", { channel, direction: 1, spin });
+        });
+      b.onpointerup = b.onpointercancel = () =>
+        guarded(() => sample("jog_stop"));
+    }
+    document
+      .querySelectorAll("[data-jog]")
+      .forEach((b) => jogButton(b, Number(b.dataset.jog), false));
+    jogButton($("spin"), 3, true);
+    function editStage(fn) {
+      return guarded(async () => {
+        if (busy || !stage) return;
+        busy = true;
+        render();
+        try { await fn(); } finally { busy = false; render(); }
+      });
+    }
+    $("startSample").onclick = () => editStage(async () => {
+      await sample("start", {turn: stage === "turn"});
+      samplingNow = true;
+      say("Sampling");
+    });
+    $("calculate").onclick = () => editStage(async () => {
+      const turn = stage === "turn";
+      try {
+        await sample("finish", {turn, [turn ? "angle_deg":"distance_mm"]: Number($("measure").value)});
+        samplingNow = false;
+        last = await call("status");
+        say("Sample calculated. Ready to save.");
+      } catch (e) {
+        if (e.message === "BAD_SAMPLE") samplingNow = false;
+        throw e;
+      }
+    });
+    $("trial").onclick = () => editStage(async () => {
+      const turn = stage === "turn", amount = Number($("trialAmount").value);
+      if (!(amount >= 1 && amount <= (turn ? 360 : 3000))) throw Error("Test target out of range");
+      trialStage = stage;
+      try {
+        await sample("trial", {turn, [turn ? "angle_deg":"distance_mm"]: amount,
+          request_key: session+"-"+id+"-"+Date.now()});
+      } catch (e) {
+        trialStage = "";
+        throw e;
+      }
+      last = await call("status");
+    });
+    $("save").onclick = () => editStage(async () => {
+      if (stage === "mapping") {
+        const m = {left_channel: Number($("leftChannel").value)};
+        for (const k of ["left_motor_sign","right_motor_sign","left_encoder_sign","right_encoder_sign"])
+          m[k] = Number($(k).value);
+        await sample("map",m);
+      }
+      const testingStage = trialStage;
+      trialStage = "";
+      try { await call("cal_checkpoint"); }
+      catch (e) { if (lease) trialStage = testingStage; throw e; }
+      clearLocal();
+      say("Saving…");
+    });
+    setInterval(async () => {
+      if (session && lastSample && Date.now() - lastSample > 1000) {
+        last.driver_online = false;
+        last.settled = false;
+        render();
+      }
+      if (mode === "manual") {
+        if (performance.now() - lastDriveAt >= 125) await serviceManual();
+        return;
+      }
+      if (!lease || queryPending) return;
+      const token = generation;
+      queryPending = true;
+      try {
+        try { await call("heartbeat"); }
+        catch (e) {
+          if (token !== generation || e.message !== "STALE_WINDOW" || !e.window || e.lease !== lease) throw e;
+          windowId = e.window;
+          await call("heartbeat");
+        }
+      } catch (e) {
+        if (token !== generation) return;
+        trialInterrupted(e.message);
+        say(({NOT_OWNER:"Control ended. Press again.", STALE_WINDOW:"Connection delayed. Press again."})[e.message] || e.message);
+        if (lease) await guarded(releaseMine);
+      } finally {
+        queryPending = false;
+      }
+    }, 100);
+    connect();
+  </script>
+</html>
