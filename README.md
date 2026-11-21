@@ -30,7 +30,7 @@ pio run -d firmware/controller
 | [tools](tools/) | 开发机验证工具与驾驶日志分析 |
 | [docs](docs/) | 安装、使用、硬件基线和设计决策 |
 
-底盘协议、实时任务边界和雷达扩展计划见[固件架构](docs/esp32-s3-architecture.md)。手机页面的交互与布局约定见[控制台风格指南](docs/rover-console-ui.md)。
+底盘协议、实时任务边界和雷达扩展接口见[固件架构](docs/esp32-s3-architecture.md)。手机页面的交互与布局约定见[控制台风格指南](docs/rover-console-ui.md)。
 
 ## 参与开发
 
