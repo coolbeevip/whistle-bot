@@ -672,7 +672,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       };
     }
     async function acquire(kind, token) {
-      const r = await call(kind === "cal" ? "cal_begin" : "claim", kind === "manual" ? {manual_pad:true} : {});
+      const r = await call(kind === "cal" ? "cal_begin" : "claim", kind === "manual" ? {manual_pad:true} : kind === "action" ? {precision:true} : {});
       if (token !== generation) {
         await releaseLease(r.lease);
         return false;

@@ -120,7 +120,7 @@ for (const [kind, op, key, value] of [
     await p.fill("#amount",key === "angle_deg" ? "45" : "0.25");
     await p.locator("#execute").tap();
     const command = await packet(op,{[key]:value});
-    assert.equal((await packet("claim")).manual_pad, undefined);
+    await packet("claim", {precision:true});
     assert.ok(command.request_key);
     await p.getByText("Movement · running").waitFor();
     await packet("heartbeat",{lease:command.lease});

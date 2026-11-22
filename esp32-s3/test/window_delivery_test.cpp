@@ -24,18 +24,20 @@ int main() {
 
     for (uint32_t start : {1000u, UINT32_MAX - 250u}) {
         LeaseWindows history;
-        uint32_t deadline = start + 450;
         for (unsigned i = 0; i < 5; ++i) history.add(i + 1, start + 100*i);
-        assert(history.renew(1, true, start + 449, deadline));
-        assert(deadline == start + 450); // replay does not buy more time
-        assert(!history.renew(1, true, start + 450, deadline));
-        assert(history.renew(3, true, start + 449, deadline));
-        assert(deadline == start + 650);
-        assert(!history.renew(2, true, start + 449, deadline));
-        assert(!history.renew(5, true, start + 650, deadline)); // expired lease
+        for (auto mode : {LeaseMode::ManualPad, LeaseMode::Precision}) {
+            uint32_t deadline = start + 450;
+            assert(history.renew(1, mode, start + 449, deadline));
+            assert(deadline == start + 450); // replay does not buy more time
+            assert(!history.renew(1, mode, start + 450, deadline));
+            assert(history.renew(3, mode, start + 449, deadline));
+            assert(deadline == start + 650);
+            assert(!history.renew(2, mode, start + 449, deadline));
+            assert(!history.renew(5, mode, start + 650, deadline)); // expired lease
+        }
         uint32_t standard = start + 550;
-        assert(!history.renew(3, false, start + 449, standard));
-        assert(history.renew(4, false, start + 449, standard));
+        assert(!history.renew(3, LeaseMode::Standard, start + 449, standard));
+        assert(history.renew(4, LeaseMode::Standard, start + 449, standard));
         assert(standard == start + 600);
     }
 }

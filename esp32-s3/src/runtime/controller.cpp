@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "controller.h"
-#include "../control/lease_windows.h"
 #include "../storage/drive_log.h"
 #include "../control/wheel.h"
 #include "../control/calibration.h"
@@ -82,7 +81,7 @@ void stop(const char *why, uint32_t now, const char *outcome = "cancelled") {
     s.owner = 0;
     s.lease = 0;
     s.window = 0;
-    s.manualPad = false;
+    s.leaseMode = LeaseMode::Standard;
     s.cal = false;
     jogEnd = 0;
     straightDirection = 0;
@@ -102,7 +101,7 @@ void newWindow(uint32_t now) {
 const char *refresh(const Command &c, uint32_t now) {
     if (!s.owner || c.session != s.owner || c.lease != s.lease || !future(expires, now))
         return "NOT_OWNER";
-    return windows.renew(c.window, s.manualPad, now, expires) ? nullptr : "STALE_WINDOW";
+    return windows.renew(c.window, s.leaseMode, now, expires) ? nullptr : "STALE_WINDOW";
 }
 Result execute(const Command &c, uint32_t now) {
     auto &f = observed;
@@ -123,9 +122,9 @@ Result execute(const Command &c, uint32_t now) {
         s.draft = s.saved;
         samples = {};
         windows = {};
-        s.manualPad = c.op == Op::Claim && c.manualPad;
+        s.leaseMode = c.op == Op::Claim ? c.leaseMode : LeaseMode::Standard;
         newWindow(now);
-        expires = now + (s.manualPad ? board::padLeaseMs : board::leaseMs);
+        expires = now + leaseDuration(s.leaseMode);
         s.reason = "ready";
         return {};
     }
@@ -135,7 +134,8 @@ Result execute(const Command &c, uint32_t now) {
         stop(c.op == Op::Release ? "released" : "cal_cancel", now);
         return {};
     }
-    if (s.manualPad && c.op != Op::Drive && c.op != Op::DriveLow) return {"MODE"};
+    if (s.leaseMode == LeaseMode::Precision && c.op != Op::Move && c.op != Op::Turn && c.op != Op::Beat) return {"MODE"};
+    if (s.leaseMode == LeaseMode::ManualPad && c.op != Op::Drive && c.op != Op::DriveLow) return {"MODE"};
     if (c.op == Op::JogStop && s.cal) {
         jogEnd = 0;
         motor.output(0, 0, now, true);
