@@ -17,6 +17,8 @@ python -m pip install pyserial -r raspberry-pi/requirements.txt
 sh tools/check.sh
 ```
 
+ESP32 板载网页的手机触控、精确运动、标定和停车行为由浏览器验收测试覆盖。安装、运行与真机检查见[控制台验收](docs/controller-acceptance.md)。
+
 修改固件或其依赖后，编译 ESP32-S3 控制器固件。
 
 ```sh
