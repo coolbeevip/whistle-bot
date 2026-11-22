@@ -1,0 +1,6 @@
+{
+  "name": "whistle-bot-esp32-console",
+  "private": true,
+  "scripts": { "start": "node server.cjs", "test": "node --test test/console.test.cjs" },
+  "devDependencies": { "playwright": "1.62.1" }
+}

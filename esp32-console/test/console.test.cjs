@@ -2,15 +2,20 @@
 const {test, before, after} = require("node:test");
 const assert = require("node:assert/strict");
 const {readFileSync} = require("node:fs");
-const path = require("node:path");
+const {createConsoleServer} = require("../server.cjs");
 const {setTimeout: sleep} = require("node:timers/promises");
 const {chromium} = require("playwright");
 const Controller = require("./controller.cjs");
 
-const html = readFileSync(path.join(__dirname, "../../web/index.html"));
+const server = createConsoleServer();
+let consoleUrl;
 let browser;
-before(async () => { browser = await chromium.launch({channel: process.env.CHROME_CHANNEL || undefined}); });
-after(async () => { await browser?.close(); });
+before(async () => {
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  consoleUrl = "http://127.0.0.1:" + server.address().port + "/";
+  browser = await chromium.launch({channel: process.env.CHROME_CHANNEL || undefined});
+});
+after(async () => { await browser?.close(); server.close(); });
 
 async function until(probe, description) {
   const deadline = Date.now() + 3500;
@@ -31,12 +36,11 @@ async function open(t, configure = () => {}) {
   const p = await context.newPage();
   p.setDefaultTimeout(3500);
   p.on("pageerror", error => errors.push(error.message));
-  await p.route("http://rover.test/", route => route.fulfill({contentType: "text/html", body: html}));
   await p.routeWebSocket("ws://rover.test/ws", socket => {
     board.socket = socket;
     socket.onMessage(raw => board.receive(raw));
   });
-  await p.goto("http://rover.test/");
+  await p.goto(consoleUrl + "?board=rover.test");
   const packet = (op, fields = {}, from = 0) => until(() => board.packets.slice(from).find(m =>
     m.op === op && Object.entries(fields).every(([k,v]) => m[k] === v)), op + " " + JSON.stringify(fields));
   await packet("subscribe", {topic: "encoders"});
@@ -301,4 +305,20 @@ test("A failed handshake reconnects and tolerates a slow status reply", async t 
   await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
   assert.ok(await p.locator(".up").isEnabled());
   assert.equal(board.packets.some(m => m.op === "claim"), false);
+});
+
+test("Changing controller address reconnects from the local page and remembers the selection", async t => {
+  const {p} = await open(t);
+  const other = new Controller();
+  await p.routeWebSocket("ws://second.test/ws", socket => {
+    other.socket = socket;
+    socket.onMessage(raw => other.receive(raw));
+  });
+  await p.locator("#settingsButton").tap();
+  await p.locator("#boardHost").fill("second.test");
+  await p.getByRole("button",{name:"Connect",exact:true}).tap();
+  await until(() => other.packets.some(m => m.op === "subscribe"), "second board handshake");
+  await p.goto(consoleUrl);
+  await until(() => other.packets.filter(m => m.op === "hello").length === 2, "remembered board handshake");
+  assert.equal(await p.locator("#boardHost").inputValue(), "second.test");
 });

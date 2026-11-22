@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// Exercise the web page served by the board and observe its actual encoder stream.
+// Exercise the web page served on the computer and observe its actual encoder stream.
 const assert = require("node:assert/strict");
 const {chromium} = require("playwright");
 
 async function run() {
   const [address, option, ...extra] = process.argv.slice(2);
   assert.ok(address && (!option || option === "--wheels-lifted") && !extra.length,
-    "Usage: node live.cjs http://BOARD/ [--wheels-lifted]");
+    "Usage: node test/live.cjs http://BOARD/ [--wheels-lifted]");
   const url = new URL(address);
   assert.equal(url.protocol, "http:");
   const browser = await chromium.launch({channel: process.env.CHROME_CHANNEL || undefined});
@@ -18,7 +18,7 @@ async function run() {
       const msg = JSON.parse(frame.payload);
       if (msg.event === "encoders") latest = msg;
     }));
-    await p.goto(url.href,{timeout:6000});
+    await p.goto("http://127.0.0.1:8765/?board=" + encodeURIComponent(url.host),{timeout:6000});
     await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
     await p.locator("#driver").getByText("Online",{exact:true}).waitFor({state:"attached"});
     await p.locator("#vehicleTelemetry summary").tap();
@@ -31,7 +31,7 @@ async function run() {
     await p.locator("button[data-page=drive]").tap();
     await p.locator("[data-drive-panel=manual]").tap();
     await waitUntil(() => latest?.driver_online && latest.feedback_age_ms < 300, 2000, "fresh encoder telemetry");
-    console.log("Board UI, WebSocket, motor feedback and navigation passed.");
+    console.log("Local console, WebSocket, motor feedback and navigation passed.");
     if (!option) return;
 
     for (const [name,left,right,x,y] of [

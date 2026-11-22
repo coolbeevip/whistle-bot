@@ -1,0 +1,180 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#141718" /><title>Rover Console</title>
+  <link rel="stylesheet" href="/src/styles.css">
+  <header>
+    <h1><span class="mark" aria-hidden="true"></span>Rover Console</h1>
+    <div class="header-tools"><output id="connection">Connecting…</output><button id="settingsButton" data-page="settings">Settings</button></div>
+  </header>
+  <main>
+    <div class="drive-summary">
+    <div class="telemetry"><span class="battery-icon" aria-hidden="true"></span><strong id="battery">Battery level unknown</strong></div>
+    <p role="alert" id="batteryAlarm" hidden>Low battery. Stop and recharge.</p>
+
+    <div class="toolbar"><div class="status-slot">
+      <output id="availability"></output><p id="feedback" role="status"></p>
+    </div><button id="stop" disabled>Stop</button></div>
+    </div>
+
+    <section id="drive" aria-label="Drive">
+      <div class="drive-switch" role="group" aria-label="Drive mode">
+        <button data-drive-panel="manual" aria-controls="manual" aria-pressed="true">Directional pad</button>
+        <button data-drive-panel="actions" aria-controls="actions" aria-pressed="false">Precision</button>
+      </div>
+      <div id="manual">
+      <div id="speedSetting">
+        <div class="speed-readout"><label for="speed">Target <output id="speedOut">0.40</output></label>
+          <span>Actual <output id="actualSpeed">—</output> m/s</span></div>
+        <input aria-label="Target speed in metres per second" id="speed" type="range" min="0.02" max="1.07" step="0.01" value="0.40">
+        <div class="speed-presets" aria-label="Speed presets in metres per second">
+          <button data-speed="0.2">0.2</button><button data-speed="0.4">0.4</button>
+          <button data-speed="0.6">0.6</button><button data-speed="0.8">0.8</button>
+        </div>
+      </div>
+      <div class="pad">
+        <button class="up" data-dir="1,1" disabled><span class="key">Forward</span></button
+        ><button class="left" data-dir="-1,1" disabled><span class="key">Left</span></button
+        ><button id="padStop" disabled>Stop</button
+        ><button data-dir="1,-1" disabled><span class="key">Right</span></button
+        ><button class="down" data-dir="-1,-1" disabled><span class="key">Reverse</span></button>
+      </div>
+      <label class="accel-setting">Acceleration <select id="acceleration">
+        <option value="smooth">Smooth</option><option value="responsive" selected>Responsive</option>
+      </select></label>
+      </div>
+    <div id="actions" hidden>
+      <div class="row">
+        <label
+          >Direction<select id="actionType">
+            <option value="forward">Forward</option>
+            <option value="reverse">Reverse</option>
+            <option value="left">Turn left</option>
+            <option value="right">Turn right</option>
+          </select></label
+        >
+        <label
+          ><span id="targetLabel">Distance</span><input
+            type="number"
+            id="amount"
+            min="0.001" max="3" required inputmode="decimal"
+            step="any"
+            value="0.5"
+          /><span id="unit">m</span></label
+        >
+        <button id="execute" disabled>Run</button>
+      </div>
+      <p id="progress" class="note" role="status"></p>
+      </div>
+    </section>
+    <section id="settings" hidden>
+      <h2>Settings</h2>
+      <form id="boardForm" class="row">
+        <label>Controller address<input id="boardHost" required autocapitalize="none" spellcheck="false"></label>
+        <button type="submit">Connect</button>
+      </form>
+      <div class="settings-tabs" role="group" aria-label="Settings panels">
+        <button data-panel="wifiPanel" aria-controls="wifiPanel" aria-pressed="true">Wi-Fi</button>
+        <button data-panel="recoveryPanel" aria-controls="recoveryPanel" aria-pressed="false">Hotspot recovery</button>
+      </div>
+      <div id="wifiPanel">
+      <p id="networkStatus" role="status">Connecting…</p>
+      <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
+      <fieldset id="networkSetup" disabled>
+        <legend>Home network</legend>
+        <button id="scanWifi">Scan networks</button>
+        <p id="scanStatus" role="status"></p>
+        <div id="nearby" role="group" aria-label="Nearby networks"></div>
+        <label>2.4 GHz network<input id="homeName" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+        <label>Password<input type="password" id="homePass" maxlength="64" autocomplete="off"></label>
+        <button id="testWifi">Test &amp; save</button>
+        <button id="forgetWifi">Forget network</button>
+      </fieldset>
+      <p id="networkMessage" role="status"></p>
+      </div>
+      <div id="recoveryPanel" hidden>
+        <dl><dt>Blue</dt><dd>Hotspot ready</dd><dt>Amber pulse</dt><dd>Scanning or connecting</dd>
+        <dt>Green</dt><dd>Connected to home Wi-Fi</dd><dt>Red pulse</dt><dd>Network setup failed</dd>
+        <dt>Purple pulse</dt><dd>Keep holding BOOT</dd></dl>
+        <p>Hold BOOT for 5 seconds to stop and reopen the hotspot.</p>
+      </div>
+    </section>
+    <section id="lidar" hidden>
+      <h2>Lidar clearance</h2>
+      <p id="sectors"></p>
+    </section>
+    <section id="cal" hidden>
+      <h2>Chassis calibration</h2>
+      <div id="trialResult" hidden>
+        <p id="trialOutcome" role="status"></p>
+        <button id="trialBack">Back to calibration</button>
+      </div>
+      <div id="overview">
+        <p>Choose a setting. Each can be saved separately and resumed after reconnecting.</p>
+        <div class="stages">
+          <button data-stage="mapping">Wheel directions<span id="mappingState">Loading…</span></button>
+          <button data-stage="distance">Distance<span id="distanceState">Loading…</span></button>
+          <button data-stage="turn">Turn angle<span id="turnState">Loading…</span></button>
+        </div>
+        <p id="params" class="note"></p>
+      </div>
+      <fieldset id="wizard" hidden disabled>
+        <legend id="stageTitle"></legend>
+        <p id="stageStatus" role="status"></p>
+        <div id="mappingForm">
+          <p>Lift the wheels and jog each one. The top of the tire moves toward the front when rolling forward. Turn each wheel forward by hand. Choose +1 if its count rises, or −1 if it falls.</p>
+          <p id="jogTicks"></p>
+        <button data-jog="3">Jog M3</button>
+        <button data-jog="4">Jog M4</button>
+        <div id="mapping">
+          <label
+            >Left wheel<select id="leftChannel">
+              <option value="3">M3</option>
+              <option value="4">M4</option>
+            </select></label
+          >
+        </div>
+        <p>Saving a changed channel or direction clears the distance and turn calibrations.</p>
+        </div>
+        <div id="sampleForm">
+          <p id="instructions"></p>
+          <button id="startSample">Start sampling</button>
+          <button id="spin" hidden>Jog left</button>
+          <label><span id="measureLabel"></span><input id="measure" type="number" step="any"><span id="measureUnit"></span></label>
+          <button id="calculate">Finish and calculate</button>
+          <hr>
+          <label><span id="trialLabel"></span><input id="trialAmount" type="number" min="1" step="any"><span id="trialUnit"></span></label>
+          <button id="trial">Test movement</button>
+          <p class="note">This test drives the wheels. Put the rover on the ground, leave room for it to move, and check the actual movement before saving.</p>
+        </div>
+        <div class="row"><button id="save">Save</button><button id="cancel">Discard and return</button></div>
+      </fieldset>
+    </section>
+    <details id="vehicleTelemetry"><summary>Vehicle telemetry</summary>
+      <div class="stats">
+        <span>Motor driver<b id="driver">—</b></span
+        ><span>Control owner<b id="owner">—</b></span>
+        <span>M3 encoder<b id="m3">—</b></span
+        ><span>M4 encoder<b id="m4">—</b></span>
+        <span>Target L / R (ticks/s)<b id="wheelTarget">—</b></span>
+        <span>Measured L / R (ticks/s)<b id="wheelRate">—</b></span>
+        <span>Sent PWM L / R<b id="wheelPwm">—</b></span>
+        <span>Wheel status<b id="still">—</b></span
+        ><span>Feedback age<b id="age">—</b></span>
+      </div>
+      <button id="exportRun" disabled>Download last drive CSV</button>
+    </details>
+  </main>
+    <nav aria-label="Console"><button data-page="drive" aria-current="page"><span class="nav-icon" aria-hidden="true">◎</span>Drive</button><button data-page="cal"><span class="nav-icon" aria-hidden="true">☷</span>Calibration</button></nav>
+  <script defer src="/src/console.js"></script>
+  <script defer src="/src/connection.js"></script>
+  <script defer src="/src/drive.js"></script>
+  <script defer src="/src/settings.js"></script>
+  <script defer src="/src/calibration.js"></script>
+  <script defer src="/src/main.js"></script>
+
+</html>

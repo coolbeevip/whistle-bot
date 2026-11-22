@@ -9,11 +9,11 @@ pio run -t upload --upload-port <ESP32串口>
 pio device monitor -p <ESP32串口> -b 115200
 ```
 
-烧录会替换 ESP32 当前程序。下载端口是 ESP32 自身标有 UART 的 USB 口。打开串口监视器后按一次 RESET，启动消息 `wifi_setup` 给出本机热点名称和密码。手机连上该热点后打开 `http://192.168.4.1/`，进入板载控制面板。网页随固件一起烧录，可以离线使用。
+烧录会替换 ESP32 当前程序。下载端口是 ESP32 自身标有 UART 的 USB 口。打开串口监视器后按一次 RESET，启动消息 `wifi_setup` 给出本机热点名称和密码。电脑连上该热点后，启动[独立控制台](../esp32-console/README.md)，用控制器地址 `192.168.4.1` 连接。
 
 ## 网络设置
 
-在板载 **Settings → Wi-Fi settings** 选择 2.4 GHz 网络，输入密码并点 **Test & save**。连接成功后，在同一局域网使用面板显示的地址访问。长按 **BOOT** 5 秒可停车并恢复热点，保留网络凭据和标定。蓝灯表示热点就绪，绿灯表示已连接家庭网络。
+在控制台 **Settings → Wi-Fi** 选择 2.4 GHz 网络，输入密码并点 **Test & save**。连接成功后，将电脑接入同一局域网，并在控制台连接面板显示的家庭网络地址。长按 **BOOT** 5 秒可停车并恢复热点，保留网络凭据和标定。蓝灯表示热点就绪，绿灯表示已连接家庭网络。
 
 ## 驾驶和标定
 
@@ -32,7 +32,7 @@ USB 使用每行一个 JSON 对象（115200、8N1），Wi-Fi 使用 `ws://192.16
 
 后续消息填入应答中的数字 `session`，递增 `id`。发送 `status` 查询状态，或发送 `subscribe`、`topic:"encoders"`、`hz:5` 订阅反馈。`claim` 返回数字 `lease` 和 `window`；在持有期间按 `control_window` 事件更新窗口。手动驾驶以 10 Hz 发送 `drive`。定距与定角只提交一次目标并附 `request_key`，随后发 `heartbeat` 续期。两个入口共用驾驶权，手机和 USB 客户端可同时观察。可选雷达适配器接口位于 [lidar.h](../esp32-s3/src/sensors/lidar.h)，默认配置无雷达。
 
-板载网页按方向键时随 `claim` 发送 `manual_pad: true`。该控制权只接受手动驾驶及停车操作。控制窗口每 100 ms 更新，续期上限为所用窗口生成后的 450 ms。引用同一窗口不会推迟截止时间，已被更新指令取代的窗口会被拒绝。松手立即请求释放。Precision 随 `claim` 发送 `precision: true`，直行、后退及转向使用相同的 450 ms 窗口。动作运行期间由 `heartbeat` 续期，按 Stop 会立即请求停车。普通 `claim` 和标定仍为 300 ms。
+独立控制台按方向键时随 `claim` 发送 `manual_pad: true`。该控制权只接受手动驾驶及停车操作。控制窗口每 100 ms 更新，续期上限为所用窗口生成后的 450 ms。引用同一窗口不会推迟截止时间，已被更新指令取代的窗口会被拒绝。松手立即请求释放。Precision 随 `claim` 发送 `precision: true`，直行、后退及转向使用相同的 450 ms 窗口。动作运行期间由 `heartbeat` 续期，按 Stop 会立即请求停车。普通 `claim` 和标定仍为 300 ms。
 
 ## 驾驶超时记录
 

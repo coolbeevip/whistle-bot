@@ -1,12 +1,12 @@
 # Whistle Bot
 
-Whistle Bot 由 ESP32-S3 控制器固件和树莓派控制台服务组成。ESP32-S3 根据编码器反馈控制两个 L520 电机；树莓派提供手机驾驶页面、摄像头预览及带输入时间戳的录像。只接 ESP32 时，也可以使用固件自带的网页驾驶和标定。
+Whistle Bot 包含 ESP32-S3 固件、电脑端底盘调试控制台和树莓派上位机。ESP32-S3 根据编码器反馈控制两个 L520 电机；树莓派提供手机驾驶页面、摄像头预览及带输入时间戳的录像。只接 ESP32 时，也可以使用电脑上的独立控制台驾驶和标定。
 
 ## 选择运行方式
 
 | 目标 | 所需组件 | 入口 |
 | --- | --- | --- |
-| 验证接线、标定轮距、控制电机 | ESP32-S3、亚博驱动板、编码器底盘 | [接线与参考硬件](docs/hardware.md) · [控制器构建与调试](docs/controller.md) |
+| 验证接线、标定轮距、控制电机 | ESP32-S3、亚博驱动板、编码器底盘 | [接线与参考硬件](docs/hardware.md) · [启动底盘控制台](esp32-console/README.md) · [控制器构建与调试](docs/controller.md) |
 | 从手机查看现场画面、驾驶或录像 | 已配置的底盘、树莓派、CSI 摄像头、USB 数据线 | [安装树莓派服务](docs/installation.md) · [控制台使用指南](docs/console.md) |
 | 让视觉模型分步执行自然语言任务 | 上述树莓派配置和兼容的 HTTP 模型端点 | [Auto 请求与响应](docs/console.md#auto-视觉驾驶) |
 
@@ -24,7 +24,8 @@ pio run -d esp32-s3
 
 | 目录 | 职责 |
 | --- | --- |
-| [esp32-s3](esp32-s3/) | C++ 控制循环、标定、USB 与 Wi-Fi 协议，以及嵌入固件的调试面板 |
+| [esp32-s3](esp32-s3/) | C++ 控制循环、标定、USB 与 WebSocket 协议 |
+| [esp32-console](esp32-console/) | 在电脑上运行的底盘驾驶、标定和网络调试网页 |
 | [raspberry-pi](raspberry-pi/) | 树莓派 HTTP/WebSocket 服务、摄像、录像、底盘串口桥及手机界面 |
 | [tools](tools/) | 开发机验证工具与驾驶日志分析 |
 | [docs](docs/) | 安装、使用、硬件基线和设计决策 |

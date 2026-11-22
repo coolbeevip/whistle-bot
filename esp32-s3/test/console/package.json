@@ -1,6 +1,0 @@
-{
-  "name": "whistle-bot-controller-acceptance",
-  "private": true,
-  "scripts": { "test": "node --test console.test.cjs" },
-  "devDependencies": { "playwright": "1.62.1" }
-}
