@@ -12,12 +12,12 @@ USB / WebSocket → 会话与协议 → 控制任务 → UART1 → 电机驱动�
 
 | 模块 | 职责 |
 | --- | --- |
-| [transport](../firmware/controller/src/transport/) 与 [protocol](../firmware/controller/src/protocol/) | 接收完整消息，校验会话、请求和驾驶权。两个入口共用底盘控制权 |
-| [runtime](../firmware/controller/src/runtime/) | 调度控制任务，处理动作、停车、超时和状态快照 |
-| [control](../firmware/controller/src/control/) | 根据标定参数换算左右轮目标，处理编码器计数、速度调节、直行修正和目标到达判断 |
-| [drivers](../firmware/controller/src/drivers/) | 封装亚博板的 UART 指令与反馈 |
-| [storage](../firmware/controller/src/storage/) | 保存标定参数和驾驶日志 |
-| [sensors](../firmware/controller/src/sensors/) | 电池电量估算和可选雷达扇区接口 |
+| [transport](../esp32-s3/src/transport/) 与 [protocol](../esp32-s3/src/protocol/) | 接收完整消息，校验会话、请求和驾驶权。两个入口共用底盘控制权 |
+| [runtime](../esp32-s3/src/runtime/) | 调度控制任务，处理动作、停车、超时和状态快照 |
+| [control](../esp32-s3/src/control/) | 根据标定参数换算左右轮目标，处理编码器计数、速度调节、直行修正和目标到达判断 |
+| [drivers](../esp32-s3/src/drivers/) | 封装亚博板的 UART 指令与反馈 |
+| [storage](../esp32-s3/src/storage/) | 保存标定参数和驾驶日志 |
+| [sensors](../esp32-s3/src/sensors/) | 电池电量估算和可选雷达扇区接口 |
 
 ## 实时控制与驾驶权
 
@@ -27,4 +27,4 @@ USB / WebSocket → 会话与协议 → 控制任务 → UART1 → 电机驱动�
 
 ## 传感器扩展
 
-默认底盘使用轮式里程计。接入雷达时，适配器通过 `LidarSource` 提供车体前、左、后、右四个扇区的净空距离、时间戳和有效位。控制任务检查数据时效；启用雷达作为行驶条件后，所需扇区缺失或净空不足会阻止该方向的运动。[雷达接口](../firmware/controller/src/sensors/lidar.h)
+默认底盘使用轮式里程计。接入雷达时，适配器通过 `LidarSource` 提供车体前、左、后、右四个扇区的净空距离、时间戳和有效位。控制任务检查数据时效；启用雷达作为行驶条件后，所需扇区缺失或净空不足会阻止该方向的运动。[雷达接口](../esp32-s3/src/sensors/lidar.h)

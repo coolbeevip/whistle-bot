@@ -15,7 +15,7 @@ Whistle Bot 由 ESP32-S3 控制器固件和树莓派控制台服务组成。ESP3
 安装 PlatformIO Core 后，在仓库根目录构建控制器。此命令只编译固件。
 
 ```sh
-pio run -d firmware/controller
+pio run -d esp32-s3
 ```
 
 首次通电前请核对驱动板输入电压、两板共地及电机通道。实际下载、串口握手和架空标定步骤见[控制器指南](docs/controller.md)。
@@ -24,8 +24,8 @@ pio run -d firmware/controller
 
 | 目录 | 职责 |
 | --- | --- |
-| [firmware/controller](firmware/controller/) | C++ 控制循环、标定、USB 与 Wi-Fi 协议，以及嵌入固件的调试面板 |
-| [upper/camera-preview](upper/camera-preview/) | 树莓派 HTTP/WebSocket 服务、摄像、录像、底盘串口桥及手机界面 |
+| [esp32-s3](esp32-s3/) | C++ 控制循环、标定、USB 与 Wi-Fi 协议，以及嵌入固件的调试面板 |
+| [raspberry-pi](raspberry-pi/) | 树莓派 HTTP/WebSocket 服务、摄像、录像、底盘串口桥及手机界面 |
 | [tools](tools/) | 开发机验证工具与驾驶日志分析 |
 | [docs](docs/) | 安装、使用、硬件基线和设计决策 |
 

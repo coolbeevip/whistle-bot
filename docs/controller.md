@@ -1,6 +1,6 @@
 # 控制器构建与调试
 
-正式固件位于 [firmware/controller](../firmware/controller)。在该目录使用 PlatformIO Core。先通过设备列表识别 ESP32 的 UART 下载口，再用实际端口替换示例中的占位符。
+正式固件位于 [esp32-s3](../esp32-s3)。在该目录使用 PlatformIO Core。先通过设备列表识别 ESP32 的 UART 下载口，再用实际端口替换示例中的占位符。
 
 ```sh
 pio run
@@ -30,4 +30,4 @@ USB 使用每行一个 JSON 对象（115200、8N1），Wi-Fi 使用 `ws://192.16
 {"v":1,"id":1,"op":"hello"}
 ```
 
-后续消息填入应答中的数字 `session`，递增 `id`。发送 `status` 查询状态，或发送 `subscribe`、`topic:"encoders"`、`hz:5` 订阅反馈。`claim` 返回数字 `lease` 和 `window`；在持有期间按 `control_window` 事件更新窗口。手动驾驶以 10 Hz 发送 `drive`。定距与定角只提交一次目标并附 `request_key`，随后发 `heartbeat` 续期。两个入口共用驾驶权，手机和 USB 客户端可同时观察。可选雷达适配器接口位于 [lidar.h](../firmware/controller/src/sensors/lidar.h)，默认配置无雷达。
+后续消息填入应答中的数字 `session`，递增 `id`。发送 `status` 查询状态，或发送 `subscribe`、`topic:"encoders"`、`hz:5` 订阅反馈。`claim` 返回数字 `lease` 和 `window`；在持有期间按 `control_window` 事件更新窗口。手动驾驶以 10 Hz 发送 `drive`。定距与定角只提交一次目标并附 `request_key`，随后发 `heartbeat` 续期。两个入口共用驾驶权，手机和 USB 客户端可同时观察。可选雷达适配器接口位于 [lidar.h](../esp32-s3/src/sensors/lidar.h)，默认配置无雷达。

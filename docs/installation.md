@@ -17,11 +17,11 @@ rpicam-hello --list-cameras
 从仓库根目录执行以下命令。用户服务使用固定的工作目录，复制时应保留整个目录，包括 `static/` 下的浏览器资源。
 
 ```sh
-mkdir -p ~/whistle-rover ~/.config/systemd/user
-cp -R upper/camera-preview ~/whistle-rover/
+mkdir -p ~/whistle-rover/camera-preview ~/.config/systemd/user
+cp -R raspberry-pi/. ~/whistle-rover/camera-preview/
 python3 -m venv --system-site-packages ~/whistle-rover/venv
 ~/whistle-rover/venv/bin/pip install -r ~/whistle-rover/camera-preview/requirements.txt
-cp upper/camera-preview/rover-camera.service ~/.config/systemd/user/
+cp raspberry-pi/rover-camera.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now rover-camera
 systemctl --user status rover-camera

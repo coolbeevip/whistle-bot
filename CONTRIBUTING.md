@@ -13,17 +13,17 @@
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install pyserial -r upper/camera-preview/requirements.txt
+python -m pip install pyserial -r raspberry-pi/requirements.txt
 sh tools/check.sh
 ```
 
 修改固件或其依赖后，编译 ESP32-S3 控制器固件。
 
 ```sh
-pio run -d firmware/controller
+pio run -d esp32-s3
 ```
 
-网页开发从 `upper/camera-preview/index.html` 和同目录的 `static/` 开始。在目标树莓派启动服务的步骤见[安装说明](docs/installation.md)。提交界面变更时附手机截图，并说明横竖屏与触控检查结果。提交运动控制变更时区分宿主机模拟、架空测试和落地测量，并记录适用的电机通道与标定状态。
+网页开发从 `raspberry-pi/index.html` 和同目录的 `static/` 开始。在目标树莓派启动服务的步骤见[安装说明](docs/installation.md)。提交界面变更时附手机截图，并说明横竖屏与触控检查结果。提交运动控制变更时区分宿主机模拟、架空测试和落地测量，并记录适用的电机通道与标定状态。
 
 ## 发布
 
