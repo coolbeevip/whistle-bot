@@ -17,17 +17,16 @@ python -m pip install pyserial -r upper/camera-preview/requirements.txt
 sh tools/check.sh
 ```
 
-修改固件或其依赖后，分别编译正式控制器与 UART 诊断工程。
+修改固件或其依赖后，编译 ESP32-S3 控制器固件。
 
 ```sh
 pio run -d firmware/controller
-pio run -d firmware/uart_check
 ```
 
 网页开发从 `upper/camera-preview/index.html` 和同目录的 `static/` 开始。在目标树莓派启动服务的步骤见[安装说明](docs/installation.md)。提交界面变更时附手机截图，并说明横竖屏与触控检查结果。提交运动控制变更时区分宿主机模拟、架空测试和落地测量，并记录适用的电机通道与标定状态。
 
 ## 发布
 
-维护者从干净检出验证宿主机测试与两个固件构建，复核 LICENSE、NOTICE、依赖和归档清单。在 GitHub Release 说明兼容硬件、变更、已验证范围与已知限制。发布固件二进制前，单独检查固件内嵌网页、实际链接的依赖及其再分发声明。版本标签指向通过验证的提交。
+维护者从干净检出验证宿主机测试与控制器固件构建，复核 LICENSE、NOTICE、依赖和归档清单。在 GitHub Release 说明兼容硬件、变更、已验证范围与已知限制。发布固件二进制前，单独检查固件内嵌网页、实际链接的依赖及其再分发声明。版本标签指向通过验证的提交。
 
 项目以公开讨论和可追溯的技术决策组织协作。治理和发行文件的编写参考 [ASF 项目协作说明](https://www.apache.org/foundation/how-it-works/)与 [LICENSE 和 NOTICE 指南](https://infra.apache.org/licensing-howto.html)。

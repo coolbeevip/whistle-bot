@@ -1,6 +1,6 @@
 # Whistle Bot
 
-Whistle Bot 是一套双轮差速小车控制软件。ESP32-S3 根据编码器反馈控制两个 L520 电机；树莓派提供手机驾驶页面、摄像头预览及带输入时间戳的录像。只接 ESP32 时，也可以使用固件自带的网页驾驶和标定。
+Whistle Bot 由 ESP32-S3 控制器固件和树莓派控制台服务组成。ESP32-S3 根据编码器反馈控制两个 L520 电机；树莓派提供手机驾驶页面、摄像头预览及带输入时间戳的录像。只接 ESP32 时，也可以使用固件自带的网页驾驶和标定。
 
 ## 选择运行方式
 
@@ -25,7 +25,6 @@ pio run -d firmware/controller
 | 目录 | 职责 |
 | --- | --- |
 | [firmware/controller](firmware/controller/) | C++ 控制循环、标定、USB 与 Wi-Fi 协议，以及嵌入固件的调试面板 |
-| [firmware/uart_check](firmware/uart_check/) | 独立的驱动板 UART 接线诊断固件 |
 | [upper/camera-preview](upper/camera-preview/) | 树莓派 HTTP/WebSocket 服务、摄像、录像、底盘串口桥及手机界面 |
 | [tools](tools/) | 开发机验证工具与驾驶日志分析 |
 | [docs](docs/) | 安装、使用、硬件基线和设计决策 |
