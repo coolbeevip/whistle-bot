@@ -337,7 +337,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       generation = 0,
       last = {},
       busy = false;
-    let pointer = null, acceptedAt = null, manualInFlight = null, lastDriveAt = 0;
+    let pointer = null, acceptedAt = null, lastDriveAt = 0;
     let queryPending = false,
       lastSample = 0;
     let page = "drive", drivePanel = "manual", stage = "", samplingNow = false;
@@ -427,7 +427,9 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       $("trialResult").hidden = false;
     }
     $("trialBack").onclick = () => { $("trialResult").hidden = true; render(); };
+    const manualInFlight = new Map();
     function clearLocal() {
+      manualInFlight.clear();
       trialStage = "";
       lease = 0;
       windowId = 0;
@@ -633,7 +635,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
             trialInterrupted(m.reason, m);
             const manual = mode === "manual";
             clearLocal();
-            const reason = {timeout:"Connection paused. Press again.", feedback_lost:"Motor feedback lost",
+            const reason = {timeout:"Drive timed out. Release and press again.", feedback_lost:"Motor feedback lost",
               wheel_stalled:"Wheel stalled", lidar_interlock:"Obstacle detected", deadline:"Controller stopped. Press again."};
             say(ownerMessage(m.owner) || reason[m.reason] || (manual ? "Drive stopped. Press again." : "Control released"));
           }
@@ -726,27 +728,29 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
         }
       }
     }
-    async function serviceManual() {
-      if (!lease || mode !== "manual" || !held || manualInFlight === generation) return;
-      const token = generation, activeLease = lease;
-      manualInFlight = token;
+    async function serviceManual(canRetry = true) {
+      if (!lease || mode !== "manual" || !held) return;
+      const token = generation, activeLease = lease, sentWindow = windowId;
+      // Keep newer 100 ms windows flowing while earlier acknowledgements are pending.
+      if (manualInFlight.has(sentWindow) || manualInFlight.size >= 3) return;
+      manualInFlight.set(sentWindow, token);
+      lastDriveAt = performance.now();
       try {
-        lastDriveAt = performance.now();
-        try { await drive(); }
-        catch (e) {
-          if (token !== generation) return;
-          if (e.message !== "STALE_WINDOW" || !e.window || e.lease !== activeLease) throw e;
-          windowId = e.window;
-          await drive();
-        }
+        await drive();
       } catch (e) {
-        if (token !== generation) return;
+        if (token !== generation || lease !== activeLease) return;
+        if (["STALE_WINDOW", "Response timed out"].includes(e.message) && windowId !== sentWindow) return;
+        if (canRetry && e.message === "STALE_WINDOW" && e.lease === activeLease &&
+            e.window && e.window !== sentWindow) {
+          windowId = e.window;
+          return serviceManual(false);
+        }
         const message = {NOT_OWNER:"Drive stopped. Press again.", STALE_WINDOW:"Connection delayed. Press again.",
           NO_FEEDBACK:"Motor feedback lost"};
         say(ownerMessage(e.owner) || message[e.message] || e.message);
         await guarded(releaseMine);
       } finally {
-        if (manualInFlight === token) manualInFlight = null;
+        if (manualInFlight.get(sentWindow) === token) manualInFlight.delete(sentWindow);
       }
     }
     dirs.forEach((b) => {
