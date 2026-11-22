@@ -34,18 +34,21 @@ bool save() {
     auto f = LittleFS.open("/drive.tmp", "w");
     if (!f) return false;
     auto print = [&](const char *fmt, auto... args) {
-        char line[240];
+        char line[384];
         int len = snprintf(line, sizeof(line), fmt, args...);
         return len > 0 && size_t(len) < sizeof(line) &&
                f.write(reinterpret_cast<uint8_t *>(line), len) == size_t(len);
     };
     bool ok = print("# run=%lu,total_samples=%u,stop=%s\n", (unsigned long)id, total, endReason) &&
-        print("ms,request_l_ticks_s,request_r_ticks_s,target_l_ticks_s,target_r_ticks_s,measured_l_ticks_s,measured_r_ticks_s,pwm_l,pwm_r,pwm_limit,battery_mv,feedback_age_ms,cruise_limit_ticks_s,responsive\n");
+        print("ms,request_l_ticks_s,request_r_ticks_s,target_l_ticks_s,target_r_ticks_s,measured_l_ticks_s,measured_r_ticks_s,pwm_l,pwm_r,pwm_limit,battery_mv,feedback_age_ms,cruise_limit_ticks_s,responsive,queued_window,window_open_ms,window_queued_ms,enqueue_failures,drive_window,drive_received_ms,drive_accepted_ms\n");
     for (unsigned i = 0; ok && i < rows; ++i) {
         const auto &v = samples[(nextRow + capacity - rows + i) % capacity];
-        ok = print("%lu,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%lu,%d,%d\n",(unsigned long)v.ms,
+        ok = print("%lu,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%lu,%d,%d,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",(unsigned long)v.ms,
                    v.requested[0],v.requested[1],v.target[0],v.target[1],v.measured[0],v.measured[1],
-                   v.pwm[0],v.pwm[1],v.pwmLimit,v.batteryMv,(unsigned long)v.feedbackAge,v.cruiseLimit,int(v.responsive));
+                   v.pwm[0],v.pwm[1],v.pwmLimit,v.batteryMv,(unsigned long)v.feedbackAge,v.cruiseLimit,int(v.responsive),
+                   (unsigned long)v.link.sentWindow,(unsigned long)v.link.openedAt,(unsigned long)v.link.queuedAt,
+                   (unsigned long)v.link.enqueueFailures,(unsigned long)v.link.driveWindow,
+                   (unsigned long)v.link.receivedAt,(unsigned long)v.link.acceptedAt);
     }
     f.flush();
     ok = ok && !f.getWriteError();

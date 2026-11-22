@@ -25,6 +25,8 @@ struct FeedbackSample {
 QueueHandle_t scanQueue;
 uint32_t encoderResets;
 Feedback observed;
+DriveLinkTiming linkTiming;
+uint32_t timingLease;
 
 uint32_t expires, oldWindow, windowAt, oldWindowAt, jogEnd, finishAt, goalStart, lastProbe, nextAction;
 int jog[2]{};
@@ -123,6 +125,10 @@ Result execute(const Command &c, uint32_t now) {
         s.cal = c.op == Op::CalBegin;
         s.owner = c.session;
         s.lease = randId();
+        portENTER_CRITICAL(&lock);
+        timingLease = s.lease;
+        linkTiming = {};
+        portEXIT_CRITICAL(&lock);
         s.draft = s.saved;
         samples = {};
         newWindow(now);
@@ -324,6 +330,15 @@ void tick(uint32_t now) {
     if (replied) {
         uint32_t previousDeadline = expires;
         result = urgent ? Result{"STOPPED"} : execute(cmd, now);
+        if (cmd.op == Op::Drive || cmd.op == Op::DriveLow || cmd.op == Op::Twist) {
+            portENTER_CRITICAL(&lock);
+            if (cmd.lease && cmd.lease == timingLease) {
+                linkTiming.driveWindow = cmd.window;
+                linkTiming.receivedAt = cmd.receivedAt;
+                linkTiming.acceptedAt = result.error ? 0 : now;
+            }
+            portEXIT_CRITICAL(&lock);
+        }
         if (result.error && s.owner)
             expires = previousDeadline;
     }
@@ -467,6 +482,9 @@ void tick(uint32_t now) {
         stop("UART_TX", now, "failed");
     for (int i = 0; i < 2; ++i) s.pwm[i] = motor.transmittedPwm(cal.physical(i));
     DriveSample row{};
+    portENTER_CRITICAL(&lock);
+    row.link = linkTiming;
+    portEXIT_CRITICAL(&lock);
     row.ms = now;
     row.feedbackAge = now - f.last;
     row.batteryMv = s.battery.fresh(now) ? std::lround(s.battery.volts * 1000) : 0;
@@ -612,6 +630,20 @@ Snapshot snapshot() {
     portEXIT_CRITICAL(&lock);
     return v;
 }
+void recordWindowAttempt(ControlWindow window, bool queued, uint32_t at) {
+    portENTER_CRITICAL(&lock);
+    if (window.lease == timingLease) {
+        if (queued) {
+            linkTiming.sentWindow = window.id;
+            linkTiming.openedAt = window.opened;
+            linkTiming.queuedAt = at;
+        } else {
+            ++linkTiming.enqueueFailures;
+        }
+    }
+    portEXIT_CRITICAL(&lock);
+}
+
 Result submit(const Command &c) {
     Result r;
     if (c.op == Op::Stop) {

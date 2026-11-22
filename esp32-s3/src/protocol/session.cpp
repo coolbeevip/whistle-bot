@@ -193,7 +193,7 @@ const char *decode(JsonDocument &d, const String &op, Command &c) {
 }
 } // namespace
 
-String handleFrame(Session &s, const String &wire, bool usb, bool setupHotspot) {
+String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb, bool setupHotspot) {
     JsonDocument q, r;
     r["v"] = 1;
     r["ok"] = false;
@@ -266,6 +266,7 @@ String handleFrame(Session &s, const String &wire, bool usb, bool setupHotspot) 
     } else {
         Command c;
         c.session = s.sid;
+        c.receivedAt = receivedAt;
         c.lease = q["lease"] | uint32_t(0);
         c.window = q["window"] | uint32_t(0);
         if (auto error = decode(q, op, c))
@@ -287,7 +288,6 @@ String handleFrame(Session &s, const String &wire, bool usb, bool setupHotspot) 
                 r["lease"] = state.lease;
                 r["window"] = state.window;
                 r["expires_at_ms"] = state.windowTime + board::leaseMs;
-                s.seenWindow = state.window;
             }
             if (result.action)
                 r["action_id"] = result.action;
@@ -300,15 +300,17 @@ String handleFrame(Session &s, const String &wire, bool usb, bool setupHotspot) 
     return s.reply;
 }
 
-String eventFrame(Session &s, uint32_t now) {
+String eventFrame(Session &s, uint32_t now, ControlWindow &window) {
+    window = {};
     if (!s.sid)
         return {};
     auto state = snapshot();
     JsonDocument d;
     d["v"] = 1;
     d["t_ms"] = now;
-    if (state.owner == s.sid && state.window != s.seenWindow) {
-        s.seenWindow = state.window;
+    const ControlWindow current{state.lease, state.window, state.windowTime};
+    if (state.owner == s.sid && s.windows.pending(current)) {
+        window = current;
         d["event"] = "control_window";
         d["lease"] = state.lease;
         d["window"] = state.window;

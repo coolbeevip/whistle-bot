@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "../control/motion.h"
+#include "../protocol/window_delivery.h"
 #include "../sensors/lidar.h"
 #include "../sensors/battery.h"
 
@@ -27,7 +28,7 @@ enum class Op {
 };
 struct Command {
     Op op{};
-    uint32_t session = 0, lease = 0, window = 0;
+    uint32_t session = 0, lease = 0, window = 0, receivedAt = 0;
     int a = 0, b = 0;
     float value = 0;
     bool turn = false, responsive = false;
@@ -57,6 +58,7 @@ struct Snapshot {
 };
 void startController(LidarSource *lidar = nullptr, LidarState config = {});
 Snapshot snapshot();
+void recordWindowAttempt(ControlWindow window, bool queued, uint32_t at);
 Result submit(const Command &cmd);
 void stopSession(uint32_t session); // released transport
 struct ActionRecord {

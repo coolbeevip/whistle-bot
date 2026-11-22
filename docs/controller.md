@@ -31,3 +31,15 @@ USB 使用每行一个 JSON 对象（115200、8N1），Wi-Fi 使用 `ws://192.16
 ```
 
 后续消息填入应答中的数字 `session`，递增 `id`。发送 `status` 查询状态，或发送 `subscribe`、`topic:"encoders"`、`hz:5` 订阅反馈。`claim` 返回数字 `lease` 和 `window`；在持有期间按 `control_window` 事件更新窗口。手动驾驶以 10 Hz 发送 `drive`。定距与定角只提交一次目标并附 `request_key`，随后发 `heartbeat` 续期。两个入口共用驾驶权，手机和 USB 客户端可同时观察。可选雷达适配器接口位于 [lidar.h](../esp32-s3/src/sensors/lidar.h)，默认配置无雷达。
+
+## 驾驶超时记录
+
+板载驾驶 CSV 每约 100 ms 采样一次，停车时再记一行。用 `tools/read_drive_log.py` 下载。新版记录追加以下字段，时间单位为 ESP32 启动后的毫秒。
+
+| 字段 | 含义 |
+| --- | --- |
+| `queued_window`、`window_open_ms`、`window_queued_ms` | 最近一次成功放入传输队列的控制窗口、生成时间和入队时间 |
+| `enqueue_failures` | 本次控制权持有期间，控制窗口因队列不可写或入队失败的累计尝试次数 |
+| `drive_window`、`drive_received_ms`、`drive_accepted_ms` | 最近一次交给控制任务的驾驶指令所引用的窗口、完整帧到达传输层的时间，以及控制任务接受时间。接受时间为 0 表示尚无成功指令或该次指令被拒绝 |
+
+比较同一窗口 ID 的入队与收令时间，可估算消息排队、手机处理及返回的总耗时。采样间发生的多次更新只保留最新值。首条指令也可以直接使用领取控制权时返回的窗口。

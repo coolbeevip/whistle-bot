@@ -31,6 +31,7 @@ void websocket(AsyncWebSocket *, AsyncWebSocketClient *socket, AwsEventType type
                size_t size) {
     if (type != WS_EVT_CONNECT && type != WS_EVT_DISCONNECT && type != WS_EVT_DATA)
         return;
+    const uint32_t receivedAt = millis();
     xSemaphoreTake(guard, portMAX_DELAY);
     Client *slot = nullptr;
     for (auto &c : clients)
@@ -60,7 +61,7 @@ void websocket(AsyncWebSocket *, AsyncWebSocketClient *socket, AwsEventType type
         } else {
             slot->frame.concat(reinterpret_cast<char *>(data), size);
             if (f->final && f->index + size == f->len) {
-                String reply = handleFrame(slot->session, slot->frame, false, socket->client()->localIP() == WiFi.softAPIP());
+                String reply = handleFrame(slot->session, slot->frame, receivedAt, false, socket->client()->localIP() == WiFi.softAPIP());
                 if (!socket->text(reply)) {
                     stopSession(slot->session.sid);
                     socket->close();
@@ -120,7 +121,7 @@ void serviceHosts() {
         char ch = Serial.read();
         if (ch == 10) {
             if (!discard && line.length()) {
-                String reply = handleFrame(usb, line, true);
+                String reply = handleFrame(usb, line, millis(), true);
                 if (Serial.availableForWrite() >= int(reply.length() + 2))
                     Serial.println(reply);
                 else {
@@ -139,19 +140,30 @@ void serviceHosts() {
         }
     }
     uint32_t now = millis();
-    String e = eventFrame(usb, now);
-    if (e.length() && Serial.availableForWrite() >= int(e.length() + 2))
-        Serial.println(e);
+    ControlWindow window;
+    String e = eventFrame(usb, now, window);
+    if (e.length()) {
+        bool sent = Serial.availableForWrite() >= int(e.length() + 2) && Serial.println(e) == e.length() + 2;
+        usb.windows.finish(window, sent);
+        if (window.id) recordWindowAttempt(window, sent, millis());
+    }
     xSemaphoreGive(guard);
     // AsyncWebServer can call connect/disconnect while holding its client-list
     // lock. Never look up a server client while holding the session mutex.
     for (auto &c : clients) {
         xSemaphoreTake(guard, portMAX_DELAY);
         uint32_t clientId = c.id;
-        e = clientId ? eventFrame(c.session, now) : String();
+        uint32_t sessionId = c.session.sid;
+        e = clientId ? eventFrame(c.session, now, window) : String();
         xSemaphoreGive(guard);
-        if (clientId && e.length() && ws.availableForWrite(clientId))
-            ws.text(clientId, e);
+        if (!clientId || !e.length()) continue;
+        bool sent = ws.availableForWrite(clientId) && ws.text(clientId, e);
+        if (window.id) {
+            recordWindowAttempt(window, sent, millis());
+            xSemaphoreTake(guard, portMAX_DELAY);
+            if (c.id == clientId && c.session.sid == sessionId) c.session.windows.finish(window, sent);
+            xSemaphoreGive(guard);
+        }
     }
     if (elapsed(now, cleanupAt, 1000)) {
         ws.cleanupClients(4);
