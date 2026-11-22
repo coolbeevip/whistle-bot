@@ -259,3 +259,25 @@ test("Motor telemetry, battery alarm and downloadable drive trace", async t => {
   const columns = header.split(",");
   assert.equal(row.split(",")[columns.indexOf("right_pwm")],"90");
 });
+
+test("Holding Forward suppresses the context menu and still releases control", async t => {
+  const {p,board,packet} = await open(t);
+  const menuCancelled = selector => p.locator(selector).evaluate(el =>
+    !el.dispatchEvent(new MouseEvent("contextmenu", {bubbles:true, cancelable:true})));
+  const lift = await touchPad(p,0.5,0.14);
+  const first = await packet("drive");
+  await sleep(650);
+  assert.ok(await menuCancelled(".up .key"));
+  board.renew();
+  await packet("drive",{lease:first.lease,window:board.window});
+  await lift();
+  await packet("release",{lease:first.lease});
+
+  const offset = board.packets.length;
+  const box = await p.locator(".pad").boundingBox();
+  await p.mouse.click(box.x + box.width/2, box.y + box.height*0.14, {button:"right"});
+  assert.equal(await menuCancelled("#speed"),false);
+  assert.equal(board.packets.slice(offset).some(m => m.op === "claim"),false);
+  for (const selector of ["[data-jog=\"3\"]","[data-jog=\"4\"]","#spin"])
+    assert.ok(await menuCancelled(selector));
+});

@@ -94,7 +94,8 @@ body[data-page="drive"] #speedSetting { margin-top: 8px; }
   border: 6px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
 }
 .pad::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #151819; }
-.pad button { position: absolute; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad, [data-jog], #spin { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
+.pad button { position: absolute; }
 .pad [data-dir] { inset: 4%; border: 0; padding: 0; border-radius: 50%; background: linear-gradient(155deg,#363c3d,#252a2b); clip-path: polygon(0 0,100% 0,60% 40%,40% 40%); }
 .pad [data-dir]:active:not(:disabled) { background: #715837; }
 .pad [data-dir]:focus-visible { background: #715837; }
@@ -753,9 +754,11 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
         if (manualInFlight.get(sentWindow) === token) manualInFlight.delete(sentWindow);
       }
     }
+    for (const control of document.querySelectorAll(".pad, [data-jog], #spin"))
+      control.addEventListener("contextmenu", e => e.preventDefault());
     dirs.forEach((b) => {
       b.onpointerdown = (e) => guarded(async () => {
-        if (held || busy || lease || !e.isPrimary) return;
+        if (held || busy || lease || !e.isPrimary || e.button !== 0) return;
         pointer = e.pointerId;
         held = b.dataset.dir.split(",").map(Number);
         mode = "claim";
@@ -1002,11 +1005,14 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
     function jogButton(b, channel, spin) {
       b.onpointerdown = (e) =>
         guarded(async () => {
+          if (!e.isPrimary || e.button !== 0) return;
           b.setPointerCapture(e.pointerId);
           await sample("jog", { channel, direction: 1, spin });
         });
-      b.onpointerup = b.onpointercancel = () =>
-        guarded(() => sample("jog_stop"));
+      b.onpointerup = b.onpointercancel = e => {
+        if (e.isPrimary && (e.type === "pointercancel" || e.button === 0))
+          guarded(() => sample("jog_stop"));
+      };
     }
     document
       .querySelectorAll("[data-jog]")
