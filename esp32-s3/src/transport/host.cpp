@@ -12,6 +12,7 @@
 
 extern const uint8_t panel[] asm("_binary_web_index_html_start");
 namespace {
+#include "panel_gzip.h"
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 SemaphoreHandle_t guard;
@@ -105,7 +106,22 @@ void startHosts() {
         xSemaphoreGive(guard);
     });
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {
-        r->send(200, "text/html; charset=utf-8", (const char *)panel);
+        AsyncWebServerResponse *response;
+        if (r->header("If-None-Match") == panelTag) {
+            response = r->beginResponse(304);
+        } else {
+            String encodings = "," + r->header("Accept-Encoding") + ",";
+            encodings.toLowerCase();
+            encodings.replace(" ", "");
+            bool gzip = encodings.indexOf(",gzip,") >= 0;
+            response = r->beginResponse(200, "text/html; charset=utf-8", gzip ? gzipPanel : panel,
+                                        gzip ? sizeof(gzipPanel) : strlen(reinterpret_cast<const char *>(panel)));
+            if (gzip) response->addHeader("Content-Encoding", "gzip");
+        }
+        response->addHeader("ETag", panelTag);
+        response->addHeader("Cache-Control", "no-cache");
+        response->addHeader("Vary", "Accept-Encoding");
+        r->send(response);
     });
     ws.setFilter([](AsyncWebServerRequest *r) {
         return !r->hasHeader("Origin") || consoleOrigin(r->header("Origin"), r->client()->localIP());

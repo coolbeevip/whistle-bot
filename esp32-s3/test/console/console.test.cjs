@@ -283,3 +283,22 @@ test("Holding Forward suppresses the context menu and still releases control", a
   for (const selector of ["[data-jog=\"3\"]","[data-jog=\"4\"]","#spin"])
     assert.ok(await menuCancelled(selector));
 });
+
+test("A failed handshake reconnects and tolerates a slow status reply", async t => {
+  const {p,board} = await open(t, b => {
+    const receive = b.receive.bind(b);
+    let first = true;
+    b.receive = raw => {
+      const m = JSON.parse(raw);
+      if (first && m.op === "hello") {
+        first = false;
+        return b.send({id:m.id,ok:false,error:"BUSY"});
+      }
+      if (m.op === "status") return setTimeout(() => receive(raw), 900);
+      receive(raw);
+    };
+  });
+  await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
+  assert.ok(await p.locator(".up").isEnabled());
+  assert.equal(board.packets.some(m => m.op === "claim"), false);
+});

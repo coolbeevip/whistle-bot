@@ -440,7 +440,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       held = pointer = acceptedAt = null;
       generation++;
     }
-    function call(op, fields = {}) {
+    function call(op, fields = {}, timeout = op.startsWith("wifi_") ? 3000 : 700) {
       if (!ws || ws.readyState !== 1 || (!session && op !== "hello"))
         return Promise.reject(Error("Disconnected"));
       const n = ++id,
@@ -454,7 +454,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
         const timer = setTimeout(() => {
           pending.delete(n);
           reject(Error("Response timed out"));
-        }, op.startsWith("wifi_") ? 3000 : 700);
+        }, timeout);
         pending.set(n, { resolve, reject, timer });
         ws.send(JSON.stringify(packet));
       });
@@ -588,20 +588,24 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
     }
     function connect() {
       ws = new WebSocket("ws://" + location.host + "/ws");
-      ws.onopen = () =>
-        guarded(async () => {
-          const h = await call("hello");
+      const socket = ws;
+      ws.onopen = async () => {
+        try {
+          const h = await call("hello", {}, 3000);
           session = h.session;
           speedLimits = h;
           rateStamp = smoothedSpeed = undefined;
-          $("connection").textContent = "Connected";
-          last = await call("status");
-          render();
-          await call("subscribe", { topic: "encoders", hz: 5 });
+          last = await call("status", {}, 3000);
+          await call("subscribe", { topic: "encoders", hz: 5 }, 3000);
           $("lidar").hidden = !h.capabilities.includes("lidar_sectors");
           if (!$("lidar").hidden)
-            await call("subscribe", { topic: "lidar_sectors", hz: 5 });
-        });
+            await call("subscribe", { topic: "lidar_sectors", hz: 5 }, 3000);
+          $("connection").textContent = "Connected";
+          render();
+        } catch {
+          socket.close();
+        }
+      };
       ws.onmessage = (e) => {
         let m;
         try {
