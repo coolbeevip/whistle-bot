@@ -32,6 +32,8 @@ USB 使用每行一个 JSON 对象（115200、8N1），Wi-Fi 使用 `ws://192.16
 
 后续消息填入应答中的数字 `session`，递增 `id`。发送 `status` 查询状态，或发送 `subscribe`、`topic:"encoders"`、`hz:5` 订阅反馈。`claim` 返回数字 `lease` 和 `window`；在持有期间按 `control_window` 事件更新窗口。手动驾驶以 10 Hz 发送 `drive`。定距与定角只提交一次目标并附 `request_key`，随后发 `heartbeat` 续期。两个入口共用驾驶权，手机和 USB 客户端可同时观察。可选雷达适配器接口位于 [lidar.h](../esp32-s3/src/sensors/lidar.h)，默认配置无雷达。
 
+板载网页按方向键时随 `claim` 发送 `manual_pad: true`。该控制权只接受手动驾驶及停车操作。控制窗口每 100 ms 更新，续期上限为所用窗口生成后的 450 ms。引用同一窗口不会推迟截止时间，已被更新指令取代的窗口会被拒绝。松手立即请求释放。普通 `claim` 和标定仍为 300 ms。
+
 ## 驾驶超时记录
 
 板载驾驶 CSV 每约 100 ms 采样一次，停车时再记一行。用 `tools/read_drive_log.py` 下载。新版记录追加以下字段，时间单位为 ESP32 启动后的毫秒。

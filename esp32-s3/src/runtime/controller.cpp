@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "controller.h"
+#include "../control/lease_windows.h"
 #include "../storage/drive_log.h"
 #include "../control/wheel.h"
 #include "../control/calibration.h"
@@ -28,7 +29,8 @@ Feedback observed;
 DriveLinkTiming linkTiming;
 uint32_t timingLease;
 
-uint32_t expires, oldWindow, windowAt, oldWindowAt, jogEnd, finishAt, goalStart, lastProbe, nextAction;
+LeaseWindows windows;
+uint32_t expires, jogEnd, finishAt, goalStart, lastProbe, nextAction;
 int jog[2]{};
 int straightDirection = 0;
 StraightTrim straightTrim;
@@ -80,7 +82,7 @@ void stop(const char *why, uint32_t now, const char *outcome = "cancelled") {
     s.owner = 0;
     s.lease = 0;
     s.window = 0;
-    oldWindow = 0;
+    s.manualPad = false;
     s.cal = false;
     jogEnd = 0;
     straightDirection = 0;
@@ -93,25 +95,14 @@ void stop(const char *why, uint32_t now, const char *outcome = "cancelled") {
     finishAt = now;
 }
 void newWindow(uint32_t now) {
-    oldWindow = s.window;
-    oldWindowAt = windowAt;
     s.window = randId();
-    windowAt = s.windowTime = now;
+    s.windowTime = now;
+    windows.add(s.window, now);
 }
 const char *refresh(const Command &c, uint32_t now) {
     if (!s.owner || c.session != s.owner || c.lease != s.lease || !future(expires, now))
         return "NOT_OWNER";
-    uint32_t origin;
-    if (c.window && c.window == s.window)
-        origin = windowAt;
-    else if (c.window && c.window == oldWindow)
-        origin = oldWindowAt;
-    else
-        return "STALE_WINDOW";
-    if (elapsed(now, origin, board::leaseMs))
-        return "STALE_WINDOW";
-    expires = origin + board::leaseMs;
-    return nullptr;
+    return windows.renew(c.window, s.manualPad, now, expires) ? nullptr : "STALE_WINDOW";
 }
 Result execute(const Command &c, uint32_t now) {
     auto &f = observed;
@@ -131,8 +122,10 @@ Result execute(const Command &c, uint32_t now) {
         portEXIT_CRITICAL(&lock);
         s.draft = s.saved;
         samples = {};
+        windows = {};
+        s.manualPad = c.op == Op::Claim && c.manualPad;
         newWindow(now);
-        expires = now + board::leaseMs;
+        expires = now + (s.manualPad ? board::padLeaseMs : board::leaseMs);
         s.reason = "ready";
         return {};
     }
@@ -142,6 +135,7 @@ Result execute(const Command &c, uint32_t now) {
         stop(c.op == Op::Release ? "released" : "cal_cancel", now);
         return {};
     }
+    if (s.manualPad && c.op != Op::Drive && c.op != Op::DriveLow) return {"MODE"};
     if (c.op == Op::JogStop && s.cal) {
         jogEnd = 0;
         motor.output(0, 0, now, true);
@@ -304,7 +298,7 @@ void tick(uint32_t now) {
     }
     if (s.owner && (!future(expires, now) || !f.fresh(now)))
         stop(f.fresh(now) ? "timeout" : "feedback_lost", now);
-    if (s.owner && elapsed(now, windowAt, 100))
+    if (s.owner && elapsed(now, s.windowTime, board::windowMs))
         newWindow(now);
     if (!f.fresh(now) && elapsed(now, lastProbe, 500)) {
         motor.output(0, 0, now, true);

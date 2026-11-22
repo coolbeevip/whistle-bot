@@ -672,7 +672,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       };
     }
     async function acquire(kind, token) {
-      const r = await call(kind === "cal" ? "cal_begin" : "claim");
+      const r = await call(kind === "cal" ? "cal_begin" : "claim", kind === "manual" ? {manual_pad:true} : {});
       if (token !== generation) {
         await releaseLease(r.lease);
         return false;
@@ -733,7 +733,7 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
       if (!lease || mode !== "manual" || !held) return;
       const token = generation, activeLease = lease, sentWindow = windowId;
       // Keep newer 100 ms windows flowing while earlier acknowledgements are pending.
-      if (manualInFlight.has(sentWindow) || manualInFlight.size >= 3) return;
+      if (manualInFlight.has(sentWindow) || manualInFlight.size >= 5) return;
       manualInFlight.set(sentWindow, token);
       lastDriveAt = performance.now();
       try {

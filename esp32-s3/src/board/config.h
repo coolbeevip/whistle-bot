@@ -15,6 +15,7 @@ constexpr int driverPwmRange = 3600; // Yahboom direct PWM command magnitude
 constexpr int maxManualMmPerSecond = 1060; // 300 rpm with the fitted 67.5 mm tires
 constexpr float referenceMmPerSecond = 60.f;
 constexpr int jogPwm = 300;       // calibration jog output
-constexpr uint32_t leaseMs = 300;
+constexpr uint32_t windowMs = 100;
+constexpr uint32_t leaseMs = 300, padLeaseMs = 450;
 constexpr uint32_t feedbackMs = 300;
 } // namespace board

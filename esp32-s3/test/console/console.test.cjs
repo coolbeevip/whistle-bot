@@ -65,6 +65,7 @@ for (const [direction, [left,right,x,y]] of Object.entries(directions)) {
     board.delayDrive = true;
     const lift = await touchPad(p,x,y);
     const fields = {left_mm_s: left*600, right_mm_s: right*600, acceleration: "smooth"};
+    await packet("claim", {manual_pad:true});
     const first = await packet("drive", fields);
     board.renew();
     await packet("drive", {...fields, window: board.window, lease: first.lease});
@@ -119,6 +120,7 @@ for (const [kind, op, key, value] of [
     await p.fill("#amount",key === "angle_deg" ? "45" : "0.25");
     await p.locator("#execute").tap();
     const command = await packet(op,{[key]:value});
+    assert.equal((await packet("claim")).manual_pad, undefined);
     assert.ok(command.request_key);
     await p.getByText("Movement · running").waitFor();
     await packet("heartbeat",{lease:command.lease});

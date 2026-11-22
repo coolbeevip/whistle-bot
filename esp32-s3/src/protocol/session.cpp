@@ -271,6 +271,7 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
         c.window = q["window"] | uint32_t(0);
         if (auto error = decode(q, op, c))
             return fail(error);
+        c.manualPad = c.op == Op::Claim && (q["manual_pad"] | false);
         auto result = submit(c);
         if (result.error) {
             r["error"] = result.error;
@@ -287,7 +288,7 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
                 r["accepted_ms"] = millis();
                 r["lease"] = state.lease;
                 r["window"] = state.window;
-                r["expires_at_ms"] = state.windowTime + board::leaseMs;
+                r["expires_at_ms"] = state.windowTime + (state.manualPad ? board::padLeaseMs : board::leaseMs);
             }
             if (result.action)
                 r["action_id"] = result.action;
@@ -314,7 +315,7 @@ String eventFrame(Session &s, uint32_t now, ControlWindow &window) {
         d["event"] = "control_window";
         d["lease"] = state.lease;
         d["window"] = state.window;
-        d["expires_at_ms"] = state.windowTime + board::leaseMs;
+        d["expires_at_ms"] = state.windowTime + (state.manualPad ? board::padLeaseMs : board::leaseMs);
     } else if (s.lastOwner != state.owner || s.lastReason != state.reason ||
                s.wasOnline != state.feedback.fresh(now) || s.lastAction != state.action ||
                s.lastActionState != state.actionState) {
