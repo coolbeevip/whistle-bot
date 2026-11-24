@@ -32,6 +32,7 @@ class Chassis:
         self.manual_max = 0
         self.precision_ops = set()
         self.angle_ready = False
+        self.distance_action_ready = False
         self.command = None
         self.pending = {}
         self.buffer = bytearray()
@@ -82,7 +83,7 @@ class Chassis:
             return "offline"
         if op not in self.precision_ops:
             return "Unsupported firmware"
-        if not (self.angle_ready if turn else self.calibrated):
+        if not (self.angle_ready if turn else self.distance_action_ready):
             return "Calibration needed"
         target = amount if turn else amount * 1000
         if direction in ("reverse", "right"):
@@ -136,7 +137,8 @@ class Chassis:
                     if "manual_max_mm_s" in msg:
                         self.manual_max = int(msg["manual_max_mm_s"])
                         self.calibrated = bool(msg.get("distance_ready")) and self.manual_max > 0
-                    self.angle_ready = bool(msg.get("calibrated"))
+                    self.angle_ready = bool(msg.get("precision_ready", msg.get("calibrated")))
+                    self.distance_action_ready = bool(msg.get("precision_ready", self.calibrated))
                     self.settled = bool(msg.get("settled"))
                     self.online = bool(msg["driver_online"])
                     self.last_state = time.monotonic()

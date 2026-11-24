@@ -26,42 +26,30 @@ function stageState(c, key) {
   if (!(turn ? c.track_mm : c.left_mm_tick)) return "Not calibrated";
   return c.checks & (turn ? 2 : 1) ? "Saved · verified" : "Saved · test needed";
 }
-const traceKeys = ["boot_id","t_ms","rate_at_ms","rate_window_ms","feedback_age_ms","left_ticks","right_ticks",
-  "left_target_ticks_s","right_target_ticks_s","left_ticks_s","right_ticks_s","left_pwm","right_pwm"];
-let trace = [], recording = false, traceBoot;
-function logDrive(m) {
-  if (traceBoot !== m.boot_id) recording = false;
-  traceBoot = m.boot_id;
-  if (!recording && (m.left_pwm || m.right_pwm || m.left_target_ticks_s || m.right_target_ticks_s)) {
-    trace = [];
-    recording = true;
-  }
-  if (!recording) return;
-  trace.push(traceKeys.map(k => m[k] ?? "").join(","));
-  if (trace.length > 3000) trace.shift();
-  $("exportRun").disabled = false;
-  if (m.settled && !m.left_pwm && !m.right_pwm) recording = false;
-}
-$("exportRun").onclick = () => {
-  const url = URL.createObjectURL(new Blob([[traceKeys.join(","), ...trace].join("\n")], {type:"text/csv"}));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "wheel-trace.csv";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
 // 67.5 mm tire circumference divided by the measured counts per wheel revolution.
 const nominalScales = [Math.PI * 67.5 / 1784, Math.PI * 67.5 / 1782];
 const nominalMean = (nominalScales[0] + nominalScales[1]) / 2;
-const presets = [...document.querySelectorAll("[data-speed]")];
+const gearButtons = [...document.querySelectorAll("[data-gear]")];
+const gearInputs = [...document.querySelectorAll("[data-gear-setting]")];
+const gearSpeeds = gearInputs.map(input => {
+  const key = "gear." + input.dataset.gearSetting;
+  const stored = Number(localStorage.getItem(key));
+  if (Number.isFinite(stored) && stored >= 0.01) input.value = stored;
+  return Number(input.value);
+});
+let selectedGear = 1, sport = true, speedCeiling = 1.07;
 let speedLimits = {}, rateStamp, smoothedSpeed;
-function showTarget() {
-  const v = Number($("speed").value);
-  $("speedOut").textContent = v.toFixed(2);
-  for (const button of presets) {
-    button.disabled = Number(button.dataset.speed) > Number($("speed").max);
-    button.setAttribute("aria-pressed", Number(button.dataset.speed) === v);
-  }
+function gearSpeed(index) {
+  return Math.min(gearSpeeds[index], speedCeiling);
+}
+function showGears() {
+  gearButtons.forEach((button, i) => {
+    button.setAttribute("aria-pressed", String(i === selectedGear));
+    button.querySelector("small").textContent = gearSpeed(i) + " m/s";
+    gearInputs[i].max = speedCeiling;
+  });
+  $("acceleration").setAttribute("aria-pressed", String(sport));
+  $("acceleration").firstElementChild.textContent = sport ? "Sport" : "Comfort";
 }
 function showActual(ready) {
   if (!ready || !last.rate_window_ms || !Number.isFinite(last.left_ticks_s) ||
@@ -79,7 +67,7 @@ function showActual(ready) {
     smoothedSpeed = last.settled ? 0 : (smoothedSpeed ?? 0) + weight * (measured - (smoothedSpeed ?? 0));
     rateStamp = last.rate_at_ms;
   }
-  $("actualSpeed").textContent = "≈" + smoothedSpeed.toFixed(2);
+  $("actualSpeed").textContent = smoothedSpeed.toFixed(2);
 }
 let feedbackTimer;
 function say(message) {
@@ -113,6 +101,7 @@ function clearLocal() {
   stage = "";
   samplingNow = false;
   held = pointer = acceptedAt = null;
+  moveKnob(0, 0);
   generation++;
 }
 async function guarded(fn) {
@@ -131,35 +120,51 @@ function ownerMessage(owner) {
   return owner === "usb" ? "USB host is driving" : owner === "wifi" ? "Another Wi-Fi client has control" : "";
 }
 const dirs = [...document.querySelectorAll("[data-dir]")];
+function renderImuRow(id, values, precision) {
+  const cells = $(id).querySelectorAll("td");
+  cells.forEach((cell, i) => {
+    cell.textContent = Number.isFinite(values?.[i]) ? values[i].toFixed(precision) : "—";
+  });
+}
+
 function render() {
+  const imu = session && Date.now() - lastSample <= 1000 ? last.imu : null;
+  renderImuRow("imuAccel", imu?.accel_g, 3);
+  renderImuRow("imuGyro", imu?.gyro_dps, 2);
   document.body.dataset.page = page;
   const ready = !!session && last.driver_online,
     free = last.owner === "free";
-  const batteryFresh = session && last.battery_valid && Number.isFinite(last.battery_v) &&
+  const batteryFresh = session && last.battery_valid && Number.isFinite(last.battery_v) && Number.isFinite(last.battery_percent) &&
     (!lastSample || Date.now() - lastSample <= 1000);
   $("battery").textContent = batteryFresh ?
-    last.battery_v.toFixed(2) + " V · ≈" + last.battery_percent + "%" : "Battery level unknown";
+    Math.round(last.battery_percent) + "%" : "—";
+  $("battery").title = batteryFresh ? last.battery_v.toFixed(2) + " V" : "Battery unavailable";
   $("batteryAlarm").hidden = !(batteryFresh && last.battery_low);
   document.body.dataset.connected = String(!!session);
   document.documentElement.style.setProperty("--charge", batteryFresh ? last.battery_percent + "%" : "0%");
-  $("padStop").disabled = $("stop").disabled = !session;
+  $("precisionStop").disabled = $("padStop").disabled = $("stop").disabled = !session;
   const precision = drivePanel === "actions";
-  $("stop").hidden = page === "drive" && !precision;
+  const statusHost = page === "drive" && !precision ? $("manual") : document.querySelector(".toolbar");
+  const statusSlot = $("availability").parentElement;
+  if (statusSlot.parentElement !== statusHost) statusHost.prepend(statusSlot);
+  $("stop").hidden = page === "drive";
+  const canInterrupt = !!session && (busy || mode === "action" || last.action_state === "running" || last.settled === false);
+  $("precisionStop").hidden = !canInterrupt;
+  $("execute").hidden = canInterrupt;
   for (const button of driveButtons) {
     const selected = drivePanel === button.dataset.drivePanel;
     $(button.dataset.drivePanel).hidden = !selected;
     button.setAttribute("aria-pressed", String(selected));
     button.disabled = !selected && (!!lease || !!held || busy);
   }
-  const turning = ["left","right"].includes($("actionType").value);
-  const actionReady = turning ? last.calibrated : last.distance_ready;
-  $("speedSetting").hidden = !last.manual_ready;
+  renderGoal(canInterrupt);
+  const turning = goalKind === "angle";
+  const actionReady = last.precision_ready ?? (turning ? last.calibrated : last.distance_ready);
+  $("speedSetting").hidden = page !== "drive" || precision || !last.manual_ready;
   if (session && last.manual_ready) {
     const maxMm = last.distance_ready ? last.manual_max_mm_s : speedLimits.basic_ticks_max * nominalMean;
-    const slider = $("speed");
-    slider.min = last.distance_ready ? Math.min(0.01, maxMm / 1000) : 0.02;
-    slider.max = Math.max(Number(slider.min), Math.floor(maxMm / 10) / 100);
-    showTarget();
+    speedCeiling = Math.max(0.01, Math.floor(maxMm / 10) / 100);
+    showGears();
   }
   showActual(ready && (!lastSample || Date.now() - lastSample < 1000));
   for (const b of dirs)
@@ -185,8 +190,8 @@ function render() {
   $("availability").textContent = !session ? "Waiting for connection" : !ready ? "Motor driver offline" :
     page === "settings" ? "Network settings" : stage ? titles[stage] : ownerMessage(last.owner) ? ownerMessage(last.owner) :
     mode === "manual" ? "Driving" : mode === "claim" ? "Getting ready" : last.owner === "self" ? "This device has control" : !last.settled ? "Waiting for wheels to stop" :
-    page === "drive" && precision && !actionReady ? (turning ? "Verify distance and angle calibration" : "Verify distance calibration") :
-    last.manual_ready ? "Ready to drive" : "Set wheel directions first";
+    page === "drive" && precision && !actionReady ? (last.yaw_ready === false ? "Keep the IMU still on level ground" : turning && last.precision_ready == null ? "Verify distance and angle calibration" : "Verify distance calibration") :
+    !last.manual_ready ? "Set wheel directions first" : page === "drive" && !precision ? "Drag to drive" : "";
   $("overview").hidden = !!stage || !$("trialResult").hidden;
   $("wizard").hidden = !stage;
   $("wizard").disabled = mode !== "cal" || busy;
@@ -212,21 +217,21 @@ function render() {
       c.checks & (stage === "turn" ? 2 : 1) ? "Test passed. Ready to save." : "Save these values or run a test.";
   }
   $("owner").textContent =
-    { free: "Available", self: "This browser", usb: "USB host", wifi: "Another Wi-Fi client" }[
+    { free: "Available", self: "This browser", usb: "USB host", wifi: "Wi-Fi client" }[
       last.owner
     ] || "—";
   $("driver").textContent = ready ? "Online" : "No feedback";
   $("still").textContent = last.settled
     ? "Stopped"
     : ready
-      ? "Moving or stopping"
+      ? "Not settled"
       : "Unknown";
   $("wheelTarget").textContent = ready ? [last.left_target_ticks_s,last.right_target_ticks_s].join(" / ") : "—";
   $("wheelRate").textContent = ready && last.rate_window_ms ? [last.left_ticks_s,last.right_ticks_s].join(" / ") : "—";
   $("wheelPwm").textContent = ready ? [last.left_pwm,last.right_pwm].join(" / ") : "—";
   $("m3").textContent = last.m3_ticks ?? "—";
   $("m4").textContent = last.m4_ticks ?? "—";
-  $("age").textContent = ready ? last.feedback_age_ms + " ms" : "—";
+  $("age").textContent = ready && Number.isFinite(last.feedback_age_ms) ? last.feedback_age_ms + " ms" : "—";
   const c = last.calibration;
   if (c)
     $("params").textContent =
@@ -239,6 +244,10 @@ function render() {
       " mm/ticks · track width " +
       Number(c.track_mm).toFixed(1) +
       " mm";
-  const progress = last.action_id ? "Movement · " + last.action_state : "";
+  let progress = last.action_id ? "Movement · " + last.action_state : "";
+  if (Number.isFinite(last.action_yaw_deg)) {
+    progress += " · Yaw " + last.action_yaw_deg.toFixed(1) + "°";
+    if (last.action_state === "failed") progress += " · " + last.reason;
+  }
   if ($("progress").textContent !== progress) $("progress").textContent = progress;
 }

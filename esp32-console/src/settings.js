@@ -8,8 +8,10 @@ for (const button of panelButtons) button.onclick = () => {
     $(other.dataset.panel).hidden = other !== button;
     other.setAttribute("aria-pressed", String(other === button));
   }
+  if (button.dataset.panel === "wifiPanel") refreshWifi();
 };
 function highlightNetwork() {
+  $("testWifi").disabled = !$("homeName").value.length;
   for (const button of $("nearby").children)
     button.setAttribute("aria-pressed", String(button.textContent === $("homeName").value));
 }
@@ -32,7 +34,7 @@ function presentNetworks(names) {
   highlightNetwork();
 }
 async function refreshWifi() {
-  if (wifiPoll || wifiRequest || page !== "settings" || !session) return;
+  if (wifiPoll || wifiRequest || page !== "settings" || $("wifiPanel").hidden || !session) return;
   wifiPoll = true;
   try {
     const net = await call("wifi_status");
@@ -45,13 +47,13 @@ async function refreshWifi() {
     $("networkAddress").hidden = !net.home_ip;
     $("homeLink").href = net.home_ip ? "?board=" + encodeURIComponent(net.home_ip) : "";
     $("homeLink").textContent = net.home_ip;
-    $("forgetWifi").disabled = !net.home_ssid;
+    $("forgetWifi").hidden = !net.home_ssid;
     $("networkMessage").textContent = !net.setup_allowed ?
       "Connect to the rover hotspot to change Wi-Fi settings." : occupied ?
       "Finish driving or calibration first." : wifiError || (net.scan_state === "running" ? "" : net.message);
     const names = net.networks || [];
     presentNetworks(names);
-    $("scanWifi").textContent = net.scan_state === "running" ? "Scanning…" : "Scan networks";
+    $("scanWifi").textContent = net.scan_state === "running" ? "Scanning…" : "Scan";
     $("scanStatus").textContent = net.scan_state === "running" ? "" :
       net.scan_state === "failed" ? "Scan failed. Retry or enter a name." :
       names.length ? names.length + (names.length === 1 ? " network found." : " networks found.") :
@@ -78,6 +80,12 @@ async function changeWifi(op,fields={}) {
     $("networkMessage").textContent = wifiError;
   } finally { wifiRequest = false; await refreshWifi(); }
 }
+$("showPass").onclick = () => {
+  const reveal = $("homePass").type === "password";
+  $("homePass").type = reveal ? "text" : "password";
+  $("showPass").textContent = reveal ? "Hide" : "Show";
+  $("showPass").setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+};
 $("scanWifi").onclick = () => changeWifi("wifi_scan");
 $("testWifi").onclick = () => {
   if (!$("homeName").value) { $("homeName").focus(); $("homeName").reportValidity(); return; }

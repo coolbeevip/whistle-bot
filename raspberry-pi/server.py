@@ -132,7 +132,7 @@ async def socket(request):
                                 "auto": {"active": bool(auto.task), "status": auto.status, "step": auto.step,
                                          "instruction": auto.instruction, "configured": bool(auto.config)},
                                 "settled": drive.settled, "drive_busy": bool(drive.hold or auto.task),
-                                "distance_ready": drive.calibrated and "move_distance" in drive.precision_ops,
+                                "distance_ready": drive.distance_action_ready and "move_distance" in drive.precision_ops,
                                 "angle_ready": drive.angle_ready and "turn_angle" in drive.precision_ops,
                                 "settings": settings, "speed_limit_mm_s": drive.speed_limit,
                                 "elapsed": int(now - record.started) if record.name else 0,

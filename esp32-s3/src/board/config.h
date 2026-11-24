@@ -4,6 +4,7 @@
 
 namespace board {
 constexpr int rx = 18, tx = 17;
+constexpr int imuSda = 8, imuScl = 9;
 constexpr unsigned baud = 115200;
 constexpr int maxSpeed = 100;     // mm/s, commissioning limit
 constexpr int maxDistance = 3000; // mm per command

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "controller.h"
+#include "../sensors/imu.h"
 #include "../storage/drive_log.h"
 #include "../control/wheel.h"
 #include "../control/calibration.h"
@@ -37,6 +38,8 @@ StraightCruise straightCruise;
 int requestedTicks = 0;
 bool responsiveDrive = false;
 int64_t straightStart[2]{};
+Heading heading;
+PrecisionGoal precisionGoal;
 bool braking = false, sampling = false, sampleTurn = false, trial = false, saving = false;
 int64_t baseline[2]{};
 CalibrationSamples samples;
@@ -255,8 +258,12 @@ Result execute(const Command &c, uint32_t now) {
         if (trial != s.cal || sampling || jogEnd || !f.settled(now))
             return {"MODE"};
         const Calibration &cal = trial ? d : s.saved;
-        if (trial ? !(c.turn ? cal.valid() : cal.distanceValid()) : !(c.turn ? cal.ready() : cal.distanceReady()))
+        if (trial ? !(c.turn ? cal.valid() : cal.distanceValid()) : !cal.distanceReady())
             return {"CAL_REQUIRED"};
+        if (!trial && !s.yawReady) return {"IMU_NOT_READY"};
+        s.gyroAction = !trial;
+        s.yawProgress = 0;
+        if (!trial) precisionGoal.begin(c.value, c.turn, heading, now);
         s.manualDir[0] = s.manualDir[1] = 0;
         s.action = ++nextAction;
         portENTER_CRITICAL(&lock);
@@ -281,6 +288,8 @@ Result execute(const Command &c, uint32_t now) {
     }
 }
 void tick(uint32_t now) {
+    heading = imuHeading();
+    s.yawReady = heading.fresh(millis());
     auto &f = observed;
     ScanSummary scan;
     if (scanQueue && xQueueReceive(scanQueue, &scan, 0))
@@ -341,7 +350,33 @@ void tick(uint32_t now) {
     s.odom.update(s.saved, f);
     s.rateAt = rates.at;
     s.rateInterval = rates.interval;
-    if (s.running) {
+    if (s.running && s.gyroAction && !s.yawReady) stop("imu_lost", now, "failed");
+    if (s.running && s.gyroAction) {
+        s.goal.measure(cal, f);
+        float distance = (s.goal.actual[0] + s.goal.actual[1]) * 0.5f;
+        precisionGoal.update(heading, distance, s.wheelSpeed, now);
+        s.yawProgress = precisionGoal.yaw;
+        if (precisionGoal.close() && !braking) {
+            braking = true;
+            finishAt = now;
+        }
+        if (braking) {
+            s.wheelSpeed[0] = s.wheelSpeed[1] = 0;
+            if (elapsed(now, finishAt, 150) && f.settled(now) && std::abs(heading.rate) < 3.f) {
+                if (precisionGoal.close()) stop("target", now, "completed");
+                else if (++precisionGoal.corrections > 2) stop("overshoot", now, "failed");
+                else {
+                    braking = false;
+                    precisionGoal.bestError = std::abs(precisionGoal.error);
+                    precisionGoal.progressAt = now;
+                }
+            }
+        } else if (elapsed(now, precisionGoal.progressAt, 2000) ||
+                   (!precisionGoal.turn && std::abs(precisionGoal.yaw) > 25.f)) {
+            stop("heading_deviation", now, "failed");
+        }
+        if (s.running && elapsed(now, goalStart, 120000)) stop("action_timeout", now, "failed");
+    } else if (s.running) {
         s.goal.measure(cal, f);
         bool reached = true;
         for (int i = 0; i < 2; i++) {

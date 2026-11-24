@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "session.h"
+#include "../sensors/imu.h"
 #include "../storage/drive_log.h"
 #include "../transport/network.h"
 #include <esp_random.h>
@@ -34,6 +35,7 @@ const char *controlOwner(const Snapshot &s, uint32_t sid) {
 void describe(JsonDocument &d, const Snapshot &s, uint32_t sid) {
     uint32_t now = millis();
     d["boot_id"] = s.boot;
+    describeImu(d);
     if (s.lidar.installed || s.lidar.required) {
         d["lidar_required"] = s.lidar.required;
         d["lidar_valid"] = s.lidar.fresh(now);
@@ -49,6 +51,9 @@ void describe(JsonDocument &d, const Snapshot &s, uint32_t sid) {
     d["owner"] = controlOwner(s, sid);
     d["manual_max_mm_s"] = s.saved.manualSpeedLimit();
     d["manual_ready"] = s.saved.directionValid();
+    d["yaw_ready"] = s.yawReady;
+    d["precision_ready"] = s.yawReady && s.saved.distanceReady();
+    if (s.action && s.gyroAction) d["action_yaw_deg"] = s.yawProgress;
     d["distance_ready"] = s.saved.distanceReady();
     d["calibrated"] = s.saved.ready();
     d["calibrating"] = s.cal;
@@ -230,10 +235,13 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
         r["max_abs_mm_s"] = state.saved.manualSpeedLimit();
         r["max_twist_mm_s"] = board::maxSpeed;
         auto caps = r["capabilities"].to<JsonArray>();
-        for (auto name : {"drive", "drive_low", "drive_twist", "drive_log", "wheel_odom", "encoders", "calibration", "move_distance", "turn_angle"})
+        for (auto name : {"imu_probe", "drive", "drive_low", "drive_twist", "drive_log", "wheel_odom", "encoders", "calibration", "move_distance", "turn_angle"})
             caps.add(name);
         if (state.lidar.installed)
             caps.add("lidar_sectors");
+    } else if (op == "imu_probe") {
+        if (snapshot().owner) return fail("BUSY");
+        if (const char *err = probeImu(r)) r["error"] = err;
     } else if (op == "drive_log") {
         if (const char *err = driveLogRead(q,r)) r["error"] = err;
     } else if (op.startsWith("wifi_")) {

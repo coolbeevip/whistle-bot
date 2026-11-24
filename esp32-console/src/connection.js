@@ -49,6 +49,7 @@ function connect() {
       speedLimits = h;
       rateStamp = smoothedSpeed = undefined;
       last = await call("status", {}, 3000);
+      lastSample = Date.now();
       await call("subscribe", { topic: "encoders", hz: 5 }, 3000);
       $("lidar").hidden = !h.capabilities.includes("lidar_sectors");
       if (!$("lidar").hidden)
@@ -86,7 +87,6 @@ function connect() {
     }
     if (["encoders", "action", "status"].includes(m.event)) {
       if (lease && acceptedAt !== null && ((m.t_ms - acceptedAt) | 0) < 0) return;
-      if (m.event === "encoders") logDrive(m);
       last = m;
       lastSample = Date.now();
       if (lease && m.owner !== "self") {

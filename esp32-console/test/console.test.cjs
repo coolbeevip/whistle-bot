@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 const {test, before, after} = require("node:test");
 const assert = require("node:assert/strict");
-const {readFileSync} = require("node:fs");
 const {createConsoleServer} = require("../server.cjs");
 const {setTimeout: sleep} = require("node:timers/promises");
 const {chromium} = require("playwright");
@@ -47,6 +46,34 @@ async function open(t, configure = () => {}) {
   return {p, board, packet};
 }
 
+test("Refreshing Drive keeps the toolbar stop hidden before the controller connects", async t => {
+  const {p} = await open(t);
+  let releaseScript;
+  const gate = new Promise(resolve => { releaseScript = resolve; });
+  await p.route("**/src/main.js", async route => {
+    await gate;
+    await route.continue();
+  });
+  await p.reload({waitUntil: "commit"});
+  const telemetry = p.locator("#vehicleTelemetry");
+  await telemetry.waitFor();
+  let top;
+  try {
+    assert.ok(await p.locator("#stop").isHidden());
+    assert.ok(await p.locator(".drive-summary").isHidden());
+    top = (await telemetry.boundingBox()).y;
+  } finally {
+    releaseScript();
+  }
+  await p.locator("body[data-connected=true]").waitFor();
+  assert.ok(await p.locator("#stop").isHidden());
+  assert.equal((await telemetry.boundingBox()).y, top);
+  await p.getByRole("button", {name:"Precision"}).tap();
+  assert.ok(await p.locator("#stop").isHidden());
+  assert.ok(await p.locator("#execute").isVisible());
+  assert.ok(await p.locator("#precisionStop").isHidden());
+});
+
 const directions = {Forward: [1,1,0.5,0.14], Reverse: [-1,-1,0.5,0.86],
   Left: [-1,1,0.14,0.5], Right: [1,-1,0.86,0.5]};
 
@@ -64,8 +91,8 @@ async function touchPad(p, x, y) {
 for (const [direction, [left,right,x,y]] of Object.entries(directions)) {
   test("Touch pad: " + direction, async t => {
     const {p,board,packet} = await open(t);
-    await p.locator("[data-speed=\"0.6\"]").tap();
-    await p.selectOption("#acceleration", "smooth");
+    await p.locator("[data-gear=\"2\"]").tap();
+    await p.locator("#acceleration").tap();
     board.delayDrive = true;
     const lift = await touchPad(p,x,y);
     const fields = {left_mm_s: left*600, right_mm_s: right*600, acceleration: "smooth"};
@@ -88,16 +115,37 @@ for (const [direction, [left,right,x,y]] of Object.entries(directions)) {
   });
 }
 
-test("Basic drive, target slider, speed presets and lease timeout", async t => {
+test("Dragging the joystick changes direction and releases at the center", async t => {
+  const {p,board,packet} = await open(t);
+  const box = await p.locator(".pad").boundingBox();
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await p.mouse.move(x,y);
+  await p.mouse.down();
+  assert.equal(board.packets.some(m => m.op === "claim"),false);
+  await p.mouse.move(x,y - box.height * 0.3);
+  const forward = await packet("drive",{left_mm_s:400,right_mm_s:400});
+  await p.mouse.move(x + box.width * 0.3,y);
+  board.renew();
+  await packet("drive",{left_mm_s:400,right_mm_s:-400,lease:forward.lease});
+  await p.mouse.move(x,y);
+  await packet("release",{lease:forward.lease});
+  await p.mouse.up();
+  assert.equal(board.packets.some(m => m.op === "stop"),false);
+});
+
+test("Basic drive uses the configured gear and stops renewing after a timeout", async t => {
   const {p,board,packet} = await open(t,b => { b.state.distance_ready = false; });
-  for (const speed of ["0.2","0.4","0.6","0.8"]) {
-    await p.locator(`[data-speed="${speed}"]`).tap();
-    assert.equal(await p.inputValue("#speed"), speed);
-  }
-  await p.locator("#speed").focus();
-  await p.keyboard.press("ArrowLeft");
-  const target = Number(await p.inputValue("#speed"));
-  assert.equal(target,0.79);
+  await p.getByRole("button",{name:"Settings"}).tap();
+  await p.getByRole("button",{name:"Chassis",exact:true}).tap();
+  await p.getByRole("button",{name:"Decrease G4 speed"}).tap();
+  assert.equal(await p.locator("#gear3").inputValue(),"0.75");
+  await p.getByText("G4 saved · 0.75 m/s").waitFor();
+  await p.locator("[data-gear-setting='3']").fill("0.79");
+  await p.locator("[data-gear-setting='3']").blur();
+  await p.getByRole("button",{name:"Drive",exact:true}).tap();
+  const gear = p.locator("[data-gear='3']");
+  await gear.tap();
+  assert.match(await gear.textContent(), /0.79 m\/s/);
   const lift = await touchPad(p,0.5,0.14);
   await packet("drive_low",{left_dir:1,right_dir:1,acceleration:"responsive",
     ticks_s: Math.round(790 / ((Math.PI*67.5/1784 + Math.PI*67.5/1782)/2))});
@@ -116,23 +164,31 @@ for (const [kind, op, key, value] of [
   test("Precision: " + kind, async t => {
     const {p,board,packet} = await open(t);
     await p.getByRole("button",{name:"Precision"}).tap();
-    await p.selectOption("#actionType",kind);
-    await p.fill("#amount","0");
-    await p.locator("#execute").tap();
-    await until(async () => (await p.textContent("#feedback")).includes("Enter"), "range feedback");
+    if (key === "angle_deg") {
+      await p.getByRole("button",{name:"Turn",exact:true}).tap();
+      await p.getByRole("button",{name:"45°",exact:true}).tap();
+    } else {
+      await p.getByRole("button",{name:"0.1 m",exact:true}).tap();
+      await p.getByRole("button",{name:"Increase by 0.10 m"}).tap();
+      for (let i = 0; i < 5; i++) await p.getByRole("button",{name:"Increase by 0.01 m"}).tap();
+    }
+    await p.getByRole("group",{name:"Direction",exact:true}).getByRole("button",{name:kind[0].toUpperCase()+kind.slice(1),exact:true}).tap();
     assert.equal(board.packets.some(m => m.op === "claim"), false);
-    await p.fill("#amount",key === "angle_deg" ? "45" : "0.25");
     await p.locator("#execute").tap();
     const command = await packet(op,{[key]:value});
     await packet("claim", {precision:true});
     assert.ok(command.request_key);
     await p.getByText("Movement · running").waitFor();
     await packet("heartbeat",{lease:command.lease});
+    assert.ok(await p.locator("#execute").isHidden());
+    assert.ok(await p.locator("#actions #precisionStop").isVisible());
     if (kind === "reverse") {
-      await p.locator("#stop").tap();
+      await p.locator("#precisionStop").tap();
       await packet("stop");
     } else board.event({owner:"free", action_state:"completed", settled:true});
     await until(() => p.locator("#execute").isEnabled(), "next action enabled");
+    assert.ok(await p.locator("#execute").isVisible());
+    assert.ok(await p.locator("#precisionStop").isHidden());
   });
 }
 
@@ -213,13 +269,21 @@ test("Settings: scan, select, save, forget and hotspot recovery", async t => {
   await packet("wifi_scan");
   await p.getByRole("button",{name:"Test AP"}).tap();
   await p.fill("#homePass","fixture-only");
+  await p.getByRole("button",{name:"Show password"}).tap();
+  assert.equal(await p.locator("#homePass").getAttribute("type"),"text");
+  await p.getByRole("button",{name:"Hide password"}).tap();
   await p.locator("#testWifi").tap();
   await packet("wifi_test",{ssid:"Test AP",password:"fixture-only"});
   p.once("dialog", d => d.accept());
   await p.locator("#forgetWifi").tap();
   await packet("wifi_forget");
-  await p.getByRole("button",{name:"Hotspot recovery"}).tap();
-  assert.ok(await p.locator("#recoveryPanel").isVisible());
+  await p.locator("#recoveryPanel summary").tap();
+  assert.ok(await p.getByText("Hold BOOT for 5 seconds", {exact:false}).isVisible());
+  await p.getByRole("button",{name:"Chassis",exact:true}).tap();
+  assert.ok(await p.locator("#wifiPanel").isHidden());
+  assert.equal(await p.locator("#chassisPanel input:visible").count(), 4);
+  await p.getByRole("button",{name:"Wi-Fi",exact:true}).tap();
+  assert.ok(await p.locator("#networkSetup").isVisible());
 });
 
 test("Losing focus releases a held direction; late replies cannot restart it", async t => {
@@ -248,22 +312,16 @@ test("An interrupted calibration trial shows its cause and returns to the stages
   assert.equal(board.packets.some(m => m.op === "cal_checkpoint"),false);
 });
 
-test("Motor telemetry, battery alarm and downloadable drive trace", async t => {
+test("Motor telemetry and battery alarm", async t => {
   const {p,board} = await open(t);
   board.event({driver_online:true,m3_ticks:123,m4_ticks:456,left_pwm:75,right_pwm:90,
     battery_valid:true,battery_low:true,battery_v:9.8,battery_percent:3,settled:false});
   await p.locator("#batteryAlarm").waitFor();
-  await p.locator("#vehicleTelemetry summary").tap();
+  assert.equal(await p.textContent("header .battery-icon #battery"), "3%");
+  await p.locator("#imuReadings").waitFor();
   assert.equal(await p.textContent("#m3"),"123");
   assert.equal(await p.textContent("#m4"),"456");
   assert.equal(await p.textContent("#wheelPwm"),"75 / 90");
-  const download = p.waitForEvent("download");
-  await p.locator("#exportRun").tap();
-  const file = await download;
-  assert.equal(file.suggestedFilename(),"wheel-trace.csv");
-  const [header,row] = readFileSync(await file.path(),"utf8").trim().split("\n");
-  const columns = header.split(",");
-  assert.equal(row.split(",")[columns.indexOf("right_pwm")],"90");
 });
 
 test("Holding Forward suppresses the context menu and still releases control", async t => {
@@ -282,7 +340,7 @@ test("Holding Forward suppresses the context menu and still releases control", a
   const offset = board.packets.length;
   const box = await p.locator(".pad").boundingBox();
   await p.mouse.click(box.x + box.width/2, box.y + box.height*0.14, {button:"right"});
-  assert.equal(await menuCancelled("#speed"),false);
+  assert.equal(await menuCancelled("#acceleration"),false);
   assert.equal(board.packets.slice(offset).some(m => m.op === "claim"),false);
   for (const selector of ["[data-jog=\"3\"]","[data-jog=\"4\"]","#spin"])
     assert.ok(await menuCancelled(selector));
@@ -315,10 +373,145 @@ test("Changing controller address reconnects from the local page and remembers t
     socket.onMessage(raw => other.receive(raw));
   });
   await p.locator("#settingsButton").tap();
+  await p.locator("#controllerPanel summary").tap();
   await p.locator("#boardHost").fill("second.test");
   await p.getByRole("button",{name:"Connect",exact:true}).tap();
   await until(() => other.packets.some(m => m.op === "subscribe"), "second board handshake");
   await p.goto(consoleUrl);
   await until(() => other.packets.filter(m => m.op === "hello").length === 2, "remembered board handshake");
   assert.equal(await p.locator("#boardHost").inputValue(), "second.test");
+});
+
+test("IMU telemetry shows signed values on each axis and clears stale samples", async t => {
+  const {p,board} = await open(t);
+  await p.locator("#imuReadings").waitFor();
+  board.event({imu:{accel_g:[-0.125,0,1.014],gyro_dps:[2.56,-3.25,0]}});
+  const accel = p.locator("#imuAccel td");
+  const gyro = p.locator("#imuGyro td");
+  await until(async () => (await accel.allTextContents())[0] === "-0.125", "IMU sample");
+  assert.deepEqual(await accel.allTextContents(), ["-0.125","0.000","1.014"]);
+  assert.deepEqual(await gyro.allTextContents(), ["2.56","-3.25","0.00"]);
+  await until(async () => (await gyro.allTextContents())[0] === "—", "stale IMU sample cleared");
+  assert.deepEqual(await accel.allTextContents(), ["—","—","—"]);
+});
+
+test("Precision gates on gyro readiness and can turn without encoder track calibration", async t => {
+  const {p,board} = await open(t,b => Object.assign(b.state, {
+    distance_ready:true, calibrated:false, yaw_ready:false, precision_ready:false
+  }));
+  await p.getByRole("button",{name:"Precision"}).tap();
+  await p.getByRole("button",{name:"Turn",exact:true}).tap();
+  await p.locator("#dirB").tap();
+  assert.ok(await p.locator("#execute").isDisabled());
+  await p.getByText("Keep the IMU still on level ground").waitFor();
+  board.event({yaw_ready:true,precision_ready:true});
+  await until(() => p.locator("#execute").isEnabled(), "gyro turn enabled");
+  board.event({action_id:2,action_state:"failed",reason:"imu_lost",action_yaw_deg:-18.5,
+    yaw_ready:false,precision_ready:false});
+  await p.getByText("Movement · failed · Yaw -18.5° · imu_lost").waitFor();
+  assert.ok(await p.locator("#execute").isDisabled());
+});
+
+test("Console content uses a shared typeface and size across panels", async t => {
+  const {p} = await open(t);
+  const mismatches = await p.evaluate(() => {
+    const mainStyle = getComputedStyle(document.querySelector("main"));
+    const text = document.querySelectorAll("main :is(h2,caption,th,td,dt,dd,p,output,small,button,label,legend,input,select), .gear-dock button, .gear-dock small");
+    return [...text].filter(el => {
+      const style = getComputedStyle(el);
+      return style.fontFamily !== mainStyle.fontFamily || style.fontSize !== mainStyle.fontSize;
+    }).map(el => el.id || el.tagName);
+  });
+  assert.deepEqual(mismatches, []);
+});
+
+test("Joystick status fits between the mode switch and pad without moving the controls", async t => {
+  const {p,board} = await open(t);
+  const pad = p.locator(".pad"), gears = p.locator("#speedSetting");
+  const before = [await pad.boundingBox(), await gears.boundingBox()];
+  board.event({owner:"usb"});
+  const status = p.locator("#manual #availability");
+  await status.getByText("USB host is driving").waitFor();
+  const overlay = await status.boundingBox();
+  const tabs = await p.locator(".drive-switch").boundingBox();
+  assert.ok(overlay.y >= tabs.y + tabs.height && overlay.y + overlay.height <= before[0].y);
+  assert.equal(await status.evaluate(el => getComputedStyle(el).pointerEvents), "none");
+  assert.deepEqual([await pad.boundingBox(), await gears.boundingBox()], before);
+  board.event({owner:"free"});
+  await status.getByText("Drag to drive",{exact:true}).waitFor();
+  assert.deepEqual([await pad.boundingBox(), await gears.boundingBox()], before);
+  await p.setViewportSize({width:320,height:640});
+  const narrowPad = await pad.boundingBox();
+  const narrowTabs = await p.locator(".drive-switch").boundingBox();
+  await p.evaluate(() => say("Drive timed out. Release and press again."));
+  const feedback = await p.locator("#feedback").boundingBox();
+  assert.ok(feedback.y >= narrowTabs.y + narrowTabs.height && feedback.y + feedback.height <= narrowPad.y, JSON.stringify({feedback,narrowTabs,narrowPad,after:await pad.boundingBox()}));
+  assert.ok(await status.isHidden());
+  await p.evaluate(() => say(""));
+  await status.getByText("Drag to drive",{exact:true}).waitFor();
+  assert.deepEqual(await pad.boundingBox(), narrowPad);
+});
+
+test("Joystick is centered between the mode switch and the docked gears", async t => {
+  const {p} = await open(t);
+  for (const height of [844, 932]) {
+    await p.setViewportSize({width:390,height});
+    const tabs = await p.locator(".drive-switch").boundingBox();
+    const pad = await p.locator(".pad").boundingBox();
+    const gears = await p.locator("#speedSetting").boundingBox();
+    const above = pad.y - (tabs.y + tabs.height);
+    const below = gears.y - (pad.y + pad.height);
+    assert.ok(above >= 0 && Math.abs(above - below) <= 1, above + " / " + below);
+  }
+});
+
+test("Narrow layout keeps related drive controls on one line", async t => {
+  const {p} = await open(t);
+  await p.setViewportSize({width:320,height:640});
+  async function sameRow(selectors) {
+    const boxes = await Promise.all(selectors.map(selector => p.locator(selector).boundingBox()));
+    assert.ok(boxes.every(Boolean));
+    const top = Math.max(...boxes.map(box => box.y));
+    const bottom = Math.min(...boxes.map(box => box.y + box.height));
+    assert.ok(top < bottom, selectors.join(" / "));
+  }
+  const telemetry = await p.locator("#vehicleTelemetry").boundingBox();
+  const pad = await p.locator(".pad").boundingBox();
+  const tabs = await p.locator(".drive-switch").boundingBox();
+  const settings = await p.locator("footer #speedSetting").boundingBox();
+  assert.ok(telemetry.y + telemetry.height <= tabs.y);
+  assert.ok(tabs.y + tabs.height <= pad.y);
+  const nav = await p.locator("nav").boundingBox();
+  assert.equal(nav.y - (settings.y + settings.height), 8);
+  await p.locator("main").evaluate(main => { main.scrollTop = main.scrollHeight; });
+  assert.equal((await p.locator("#speedSetting").boundingBox()).y, settings.y);
+  await sameRow(["[data-gear='0']","[data-gear='3']","#acceleration"]);
+  await p.getByRole("button",{name:"Precision"}).tap();
+  assert.ok(await p.locator("#speedSetting").isHidden());
+  await sameRow(["[data-nudge='-10']", "#goalValue", "[data-nudge='10']"]);
+  await p.getByRole("button",{name:"Settings"}).tap();
+  await sameRow(["#homeName","#scanWifi"]);
+  await sameRow(["#homePass","#showPass"]);
+  await p.locator("#controllerPanel summary").tap();
+  await sameRow(["#boardHost","#boardForm button"]);
+});
+
+test("Telemetry values stay on one line without shifting the drive controls", async t => {
+  const {p,board} = await open(t);
+  for (const width of [320, 390, 760]) {
+    await p.setViewportSize({width,height:844});
+    board.event({owner:"free",settled:true,m3_ticks:1,m4_ticks:2});
+    await p.locator("#m3").getByText("1",{exact:true}).waitFor();
+    const before = await p.locator(".drive-switch").boundingBox();
+    board.event({owner:"wifi",settled:false,m3_ticks:-2147483648,m4_ticks:2147483647,
+      left_pwm:-1000,right_pwm:1000,left_target_ticks_s:-9000,right_target_ticks_s:9000,
+      left_ticks_s:-8999,right_ticks_s:8999,rate_window_ms:100,feedback_age_ms:999,
+      imu:{accel_g:[-15.999,15.999,-15.999],gyro_dps:[-1999.99,-1999.99,1999.99]}});
+    await p.locator("#m3").getByText("-2147483648",{exact:true}).waitFor();
+    const after = await p.locator(".drive-switch").boundingBox();
+    assert.equal(after.y,before.y);
+    const fits = await p.locator("#vehicleTelemetry").evaluate(region =>
+      [...region.querySelectorAll("dl > div, th, td")].every(cell => cell.scrollWidth <= cell.clientWidth + 1));
+    assert.ok(fits, "readings fit at " + width + "px");
+  }
 });

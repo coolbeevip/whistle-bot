@@ -21,9 +21,9 @@ async function run() {
     await p.goto("http://127.0.0.1:8765/?board=" + encodeURIComponent(url.host),{timeout:6000});
     await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
     await p.locator("#driver").getByText("Online",{exact:true}).waitFor({state:"attached"});
-    await p.locator("#vehicleTelemetry summary").tap();
+    await p.locator("#imuReadings").waitFor();
     await p.locator("[data-drive-panel=actions]").tap();
-    await p.locator("#amount").waitFor();
+    await p.locator("#goalValue").waitFor();
     await p.locator("button[data-page=cal]").tap();
     await p.locator("[data-stage=mapping]").waitFor();
     await p.locator("#settingsButton").tap();
@@ -38,7 +38,7 @@ async function run() {
       ["Forward",1,1,0.5,0.14],["Reverse",-1,-1,0.5,0.86],
       ["Left",-1,1,0.14,0.5],["Right",1,-1,0.86,0.5]]) {
       assert.ok(latest.owner === "free" && latest.settled && latest.manual_ready, "Chassis must be idle and ready");
-      await p.locator("[data-speed=\"0.2\"]").tap();
+      await p.locator("[data-gear=\"0\"]").tap();
       const pad = p.locator(".pad");
       await pad.scrollIntoViewIfNeeded();
       const box = await pad.boundingBox();

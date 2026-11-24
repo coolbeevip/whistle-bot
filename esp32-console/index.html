@@ -1,106 +1,173 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <html lang="en">
+<head>
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   />
-  <meta name="theme-color" content="#141718" /><title>Rover Console</title>
+  <meta name="theme-color" content="#141718" /><title>Whistle Bot</title>
   <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body data-page="drive">
   <header>
-    <h1><span class="mark" aria-hidden="true"></span>Rover Console</h1>
-    <div class="header-tools"><output id="connection">Connecting…</output><button id="settingsButton" data-page="settings">Settings</button></div>
+    <h1><span class="mark" aria-hidden="true"></span>Whistle Bot</h1>
+    <output class="sr-only" id="connection">Connecting…</output>
+    <div class="battery-icon"><span class="sr-only">Battery </span><strong id="battery">—</strong></div>
   </header>
   <main>
     <div class="drive-summary">
-    <div class="telemetry"><span class="battery-icon" aria-hidden="true"></span><strong id="battery">Battery level unknown</strong></div>
     <p role="alert" id="batteryAlarm" hidden>Low battery. Stop and recharge.</p>
 
-    <div class="toolbar"><div class="status-slot">
-      <output id="availability"></output><p id="feedback" role="status"></p>
-    </div><button id="stop" disabled>Stop</button></div>
+    <div class="toolbar"><button id="stop" hidden disabled class="icon-button" aria-label="Stop" title="Stop"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none"/></svg></button></div>
     </div>
 
     <section id="drive" aria-label="Drive">
+      <section id="vehicleTelemetry" aria-label="Vehicle telemetry">
+        <div class="instrument-card">
+          <table class="instrument" id="imuReadings">
+            <caption>IMU <small>IMU660RB</small></caption>
+            <thead><tr><td></td><th scope="col">X</th><th scope="col">Y</th><th scope="col">Z</th></tr></thead>
+            <tbody>
+              <tr id="imuAccel"><th scope="row">Accel (g)</th><td>—</td><td>—</td><td>—</td></tr>
+              <tr id="imuGyro"><th scope="row">Gyro (°/s)</th><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="instrument-card">
+          <h2 class="instrument-title">Chassis</h2>
+          <dl id="chassisReadings">
+            <div><dt>Driver</dt><dd id="driver">—</dd></div>
+            <div><dt>Owner</dt><dd id="owner">—</dd></div>
+            <div><dt>M3 encoder</dt><dd id="m3">—</dd></div>
+            <div><dt>M4 encoder</dt><dd id="m4">—</dd></div>
+            <div><dt>Speed (m/s)</dt><dd id="actualSpeed">—</dd></div>
+            <div><dt>Wheels</dt><dd id="still">—</dd></div>
+            <div><dt>Feedback age</dt><dd id="age">—</dd></div>
+            <div><dt>PWM L/R</dt><dd id="wheelPwm">—</dd></div>
+            <div class="wide-reading"><dt>Target L/R (ticks/s)</dt><dd id="wheelTarget">—</dd></div>
+            <div class="wide-reading"><dt>Measured L/R (ticks/s)</dt><dd id="wheelRate">—</dd></div>
+          </dl>
+        </div>
+      </section>
       <div class="drive-switch" role="group" aria-label="Drive mode">
-        <button data-drive-panel="manual" aria-controls="manual" aria-pressed="true">Directional pad</button>
+        <button data-drive-panel="manual" aria-controls="manual" aria-pressed="true">Joystick</button>
         <button data-drive-panel="actions" aria-controls="actions" aria-pressed="false">Precision</button>
       </div>
       <div id="manual">
-      <div id="speedSetting">
-        <div class="speed-readout"><label for="speed">Target <output id="speedOut">0.40</output></label>
-          <span>Actual <output id="actualSpeed">—</output> m/s</span></div>
-        <input aria-label="Target speed in metres per second" id="speed" type="range" min="0.02" max="1.07" step="0.01" value="0.40">
-        <div class="speed-presets" aria-label="Speed presets in metres per second">
-          <button data-speed="0.2">0.2</button><button data-speed="0.4">0.4</button>
-          <button data-speed="0.6">0.6</button><button data-speed="0.8">0.8</button>
+        <div class="status-slot">
+          <output id="availability">Connecting…</output><p id="feedback" role="status"></p>
         </div>
-      </div>
       <div class="pad">
-        <button class="up" data-dir="1,1" disabled><span class="key">Forward</span></button
-        ><button class="left" data-dir="-1,1" disabled><span class="key">Left</span></button
-        ><button id="padStop" disabled>Stop</button
-        ><button data-dir="1,-1" disabled><span class="key">Right</span></button
-        ><button class="down" data-dir="-1,-1" disabled><span class="key">Reverse</span></button>
+        <span class="connection-light" aria-hidden="true"></span>
+        <button class="up" data-dir="1,1" disabled aria-label="Forward" title="Forward"><span class="key" aria-hidden="true"></span></button
+        ><button class="left" data-dir="-1,1" disabled aria-label="Left" title="Left"><span class="key" aria-hidden="true"></span></button
+        ><button id="padStop" disabled aria-label="Stop" title="Stop"></button
+        ><button data-dir="1,-1" disabled aria-label="Right" title="Right"><span class="key" aria-hidden="true"></span></button
+        ><button class="down" data-dir="-1,-1" disabled aria-label="Reverse" title="Reverse"><span class="key" aria-hidden="true"></span></button>
       </div>
-      <label class="accel-setting">Acceleration <select id="acceleration">
-        <option value="smooth">Smooth</option><option value="responsive" selected>Responsive</option>
-      </select></label>
+
       </div>
     <div id="actions" hidden>
-      <div class="row">
-        <label
-          >Direction<select id="actionType">
-            <option value="forward">Forward</option>
-            <option value="reverse">Reverse</option>
-            <option value="left">Turn left</option>
-            <option value="right">Turn right</option>
-          </select></label
-        >
-        <label
-          ><span id="targetLabel">Distance</span><input
-            type="number"
-            id="amount"
-            min="0.001" max="3" required inputmode="decimal"
-            step="any"
-            value="0.5"
-          /><span id="unit">m</span></label
-        >
-        <button id="execute" disabled>Run</button>
+      <div class="goalChoices">
+        <div class="goalRow" aria-label="Movement type" role="group">
+          <button data-kind="distance">Move</button
+          ><button data-kind="angle">Turn</button>
+        </div>
+        <div class="goalRow" aria-label="Direction" role="group">
+          <button id="dirA"></button><button id="dirB"></button>
+        </div>
       </div>
+      <div class="goalAmount">
+        <div id="goalStepper">
+          <button data-nudge="-10">«</button
+          ><button data-nudge="-1">‹</button
+          ><output id="goalValue" aria-label="Target"></output
+          ><button data-nudge="1">›</button
+          ><button data-nudge="10">»</button>
+        </div>
+        <div class="goalRow" aria-label="Target presets" role="group">
+          <button></button><button></button><button></button
+          ><button></button>
+        </div>
+      </div>
+      <button id="execute" disabled>GO</button>
+      <button id="precisionStop" hidden disabled>Stop</button>
       <p id="progress" class="note" role="status"></p>
       </div>
     </section>
-    <section id="settings" hidden>
-      <h2>Settings</h2>
-      <form id="boardForm" class="row">
-        <label>Controller address<input id="boardHost" required autocapitalize="none" spellcheck="false"></label>
-        <button type="submit">Connect</button>
-      </form>
+    <section id="settings" aria-label="Settings" hidden>
       <div class="settings-tabs" role="group" aria-label="Settings panels">
         <button data-panel="wifiPanel" aria-controls="wifiPanel" aria-pressed="true">Wi-Fi</button>
-        <button data-panel="recoveryPanel" aria-controls="recoveryPanel" aria-pressed="false">Hotspot recovery</button>
+        <button data-panel="chassisPanel" aria-controls="chassisPanel" aria-pressed="false">Chassis</button>
+      </div>
+      <div id="chassisPanel" hidden>
+        <section class="settings-card" aria-labelledby="gearTitle">
+          <div class="settings-heading"><h2 id="gearTitle">Gear speeds</h2><span>m/s</span></div>
+          <div class="gear-row">
+            <label for="gear0">G1</label>
+            <button data-adjust="-1" aria-label="Decrease G1 speed">−</button>
+            <input id="gear0" data-gear-setting="0" type="number" inputmode="decimal" min="0.01" step="0.01" required value="0.20">
+            <button data-adjust="1" aria-label="Increase G1 speed">+</button>
+          </div>
+          <div class="gear-row">
+            <label for="gear1">G2</label>
+            <button data-adjust="-1" aria-label="Decrease G2 speed">−</button>
+            <input id="gear1" data-gear-setting="1" type="number" inputmode="decimal" min="0.01" step="0.01" required value="0.40">
+            <button data-adjust="1" aria-label="Increase G2 speed">+</button>
+          </div>
+          <div class="gear-row">
+            <label for="gear2">G3</label>
+            <button data-adjust="-1" aria-label="Decrease G3 speed">−</button>
+            <input id="gear2" data-gear-setting="2" type="number" inputmode="decimal" min="0.01" step="0.01" required value="0.60">
+            <button data-adjust="1" aria-label="Increase G3 speed">+</button>
+          </div>
+          <div class="gear-row">
+            <label for="gear3">G4</label>
+            <button data-adjust="-1" aria-label="Decrease G4 speed">−</button>
+            <input id="gear3" data-gear-setting="3" type="number" inputmode="decimal" min="0.01" step="0.01" required value="0.80">
+            <button data-adjust="1" aria-label="Increase G4 speed">+</button>
+          </div>
+          <p id="gearStatus" role="status">Saved on this browser</p>
+        </section>
       </div>
       <div id="wifiPanel">
-      <p id="networkStatus" role="status">Connecting…</p>
-      <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
-      <fieldset id="networkSetup" disabled>
-        <legend>Home network</legend>
-        <button id="scanWifi">Scan networks</button>
-        <p id="scanStatus" role="status"></p>
-        <div id="nearby" role="group" aria-label="Nearby networks"></div>
-        <label>2.4 GHz network<input id="homeName" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
-        <label>Password<input type="password" id="homePass" maxlength="64" autocomplete="off"></label>
-        <button id="testWifi">Test &amp; save</button>
-        <button id="forgetWifi">Forget network</button>
-      </fieldset>
-      <p id="networkMessage" role="status"></p>
-      </div>
-      <div id="recoveryPanel" hidden>
+        <section class="settings-card" aria-labelledby="wifiTitle">
+          <div class="settings-heading"><h2 id="wifiTitle">Home Wi-Fi</h2><span>2.4 GHz</span></div>
+          <p id="networkStatus" role="status">Connecting…</p>
+          <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
+          <fieldset id="networkSetup" aria-label="Join a network" disabled>
+            <div class="network-entry">
+              <label for="homeName">Network</label>
+              <input id="homeName" placeholder="Network name" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false">
+              <button id="scanWifi" aria-label="Scan networks">Scan</button>
+            </div>
+            <p id="scanStatus" role="status"></p>
+            <div id="nearby" role="group" aria-label="Nearby networks"></div>
+            <div class="network-entry">
+              <label for="homePass">Password</label>
+              <input type="password" id="homePass" maxlength="64" autocomplete="off">
+              <button id="showPass" aria-label="Show password">Show</button>
+            </div>
+            <button id="testWifi" disabled>Connect &amp; save</button>
+            <button id="forgetWifi" hidden>Forget saved network</button>
+          </fieldset>
+          <p id="networkMessage" role="status"></p>
+        </section>
+        <details class="settings-card" id="controllerPanel">
+          <summary>Controller address</summary>
+          <form id="boardForm" class="row">
+            <input id="boardHost" aria-label="Controller address" required autocapitalize="none" spellcheck="false">
+            <button type="submit">Connect</button>
+          </form>
+        </details>
+      <details class="settings-card" id="recoveryPanel">
+        <summary>Hotspot recovery</summary>
         <dl><dt>Blue</dt><dd>Hotspot ready</dd><dt>Amber pulse</dt><dd>Scanning or connecting</dd>
         <dt>Green</dt><dd>Connected to home Wi-Fi</dd><dt>Red pulse</dt><dd>Network setup failed</dd>
         <dt>Purple pulse</dt><dd>Keep holding BOOT</dd></dl>
         <p>Hold BOOT for 5 seconds to stop and reopen the hotspot.</p>
+      </details>
       </div>
     </section>
     <section id="lidar" hidden>
@@ -111,10 +178,9 @@
       <h2>Chassis calibration</h2>
       <div id="trialResult" hidden>
         <p id="trialOutcome" role="status"></p>
-        <button id="trialBack">Back to calibration</button>
+        <button id="trialBack" class="icon-button" aria-label="Back to calibration" title="Back to calibration"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m10 5-7 7 7 7M3 12h18"/></svg></button>
       </div>
       <div id="overview">
-        <p>Choose a setting. Each can be saved separately and resumed after reconnecting.</p>
         <div class="stages">
           <button data-stage="mapping">Wheel directions<span id="mappingState">Loading…</span></button>
           <button data-stage="distance">Distance<span id="distanceState">Loading…</span></button>
@@ -154,22 +220,29 @@
         <div class="row"><button id="save">Save</button><button id="cancel">Discard and return</button></div>
       </fieldset>
     </section>
-    <details id="vehicleTelemetry"><summary>Vehicle telemetry</summary>
-      <div class="stats">
-        <span>Motor driver<b id="driver">—</b></span
-        ><span>Control owner<b id="owner">—</b></span>
-        <span>M3 encoder<b id="m3">—</b></span
-        ><span>M4 encoder<b id="m4">—</b></span>
-        <span>Target L / R (ticks/s)<b id="wheelTarget">—</b></span>
-        <span>Measured L / R (ticks/s)<b id="wheelRate">—</b></span>
-        <span>Sent PWM L / R<b id="wheelPwm">—</b></span>
-        <span>Wheel status<b id="still">—</b></span
-        ><span>Feedback age<b id="age">—</b></span>
-      </div>
-      <button id="exportRun" disabled>Download last drive CSV</button>
-    </details>
   </main>
-    <nav aria-label="Console"><button data-page="drive" aria-current="page"><span class="nav-icon" aria-hidden="true">◎</span>Drive</button><button data-page="cal"><span class="nav-icon" aria-hidden="true">☷</span>Calibration</button></nav>
+  <footer>
+    <div class="gear-dock">
+        <div id="speedSetting" hidden role="group" aria-label="Joystick gears and acceleration">
+          <button data-gear="0">G1<small>0.20 m/s</small></button>
+          <button data-gear="1">G2<small>0.40 m/s</small></button>
+          <button data-gear="2">G3<small>0.60 m/s</small></button>
+          <button data-gear="3">G4<small>0.80 m/s</small></button>
+          <button id="acceleration" aria-label="Sport mode" aria-pressed="true"><span>Sport</span><small>Mode</small></button>
+        </div>
+    </div>
+  <nav aria-label="Console">
+    <button data-page="drive" aria-current="page">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="m4 9 6 2m10-2-6 2m-2 3v7"/></svg>Drive
+    </button>
+    <button data-page="cal">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21Zm9-9 3 3m-7 1 2 2m-6 2 3 3"/></svg>Calibration
+    </button>
+    <button id="settingsButton" data-page="settings">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h5m4 0h9M3 12h11m4 0h3M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>Settings
+    </button>
+  </nav>
+  </footer>
   <script defer src="/src/console.js"></script>
   <script defer src="/src/connection.js"></script>
   <script defer src="/src/drive.js"></script>
@@ -177,4 +250,5 @@
   <script defer src="/src/calibration.js"></script>
   <script defer src="/src/main.js"></script>
 
+</body>
 </html>

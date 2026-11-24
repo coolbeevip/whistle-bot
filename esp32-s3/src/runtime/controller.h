@@ -50,6 +50,8 @@ struct Snapshot {
     Goal goal{};
     WheelOdometry odom{};
     uint32_t action = 0;
+    bool yawReady = false, gyroAction = false;
+    float yawProgress = 0;
     int wheelSpeed[2]{}, manualDir[2]{};
     float measuredTicks[2]{}, referenceTicks[2]{};
     int pwm[2]{}; // logical wheel order, physical UART sign
