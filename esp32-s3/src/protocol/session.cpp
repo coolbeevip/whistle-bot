@@ -54,6 +54,10 @@ void describe(JsonDocument &d, const Snapshot &s, uint32_t sid) {
     d["yaw_ready"] = s.yawReady;
     d["precision_ready"] = s.yawReady && s.saved.distanceReady();
     if (s.action && s.gyroAction) d["action_yaw_deg"] = s.yawProgress;
+    if (s.action) {
+        d["action_reason"] = s.actionReason;
+        d[s.turnAction ? "action_target_deg" : "action_target_mm"] = s.actionTarget;
+    }
     d["distance_ready"] = s.saved.distanceReady();
     d["calibrated"] = s.saved.ready();
     d["calibrating"] = s.cal;
@@ -104,9 +108,11 @@ const char *decode(JsonDocument &d, const String &op, Command &c) {
         if (d["acceleration"] != "smooth" && d["acceleration"] != "responsive") return "RANGE";
         c.responsive = d["acceleration"] == "responsive";
     }
-    if (op == "release")
+    if (op == "release") {
         c.op = Op::Release;
-    else if (op == "claim")
+        for (const char *reason : {"page_hidden", "focus_lost", "heartbeat_failed", "command_failed"})
+            if (d["reason"] == reason) c.releaseReason = reason;
+    } else if (op == "claim")
         c.op = Op::Claim;
     else if (op == "stop")
         c.op = Op::Stop;
@@ -249,12 +255,25 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
             r["error"] = error;
     } else if (op == "status") {
         describe(r, snapshot(), s.sid);
-        if (q["request_key"].is<const char *>()) {
+        if (q["request_key"].is<const char *>() || q["action_id"].is<uint32_t>()) {
             ActionRecord action;
-            if (lookupAction(q["request_key"] | "", action)) {
+            if (lookupAction(q["request_key"].as<const char *>(), q["action_id"] | uint32_t(0), action)) {
                 r["action_id"] = action.id;
                 r["action_state"] = action.state;
                 r["action_reason"] = action.reason;
+                r.remove("action_target_deg");
+                r.remove("action_target_mm");
+                r[action.turn ? "action_target_deg" : "action_target_mm"] = action.target;
+                if (action.gyro) r["action_yaw_deg"] = action.yaw;
+                else r.remove("action_yaw_deg");
+                if (action.coast.started) {
+                    r["brake_yaw_deg"] = action.coast.startYaw;
+                    r["brake_rate_dps"] = action.coast.startRate;
+                    if (action.coast.settled) {
+                        r["coast_deg"] = action.coast.travel;
+                        r["brake_to_confirmed_rest_ms"] = action.coast.untilSettledMs;
+                    }
+                }
                 r["left_goal_mm"] = action.goal.target[0];
                 r["right_goal_mm"] = action.goal.target[1];
                 r["left_progress_mm"] = action.goal.actual[0];

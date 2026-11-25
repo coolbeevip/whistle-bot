@@ -15,11 +15,11 @@ jobs:
           node-version: '22'
       - run: python -m pip install pyserial -r raspberry-pi/requirements.txt
       - run: sh tools/check.sh
-  controller-console:
+  android-ui:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: esp32-console
+        working-directory: esp32-android
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -46,6 +46,35 @@ int main() {
         h.degrees += sign * 90;
         goal.update(h, 0, speed, 200);
         assert(goal.close());
+        h.degrees -= sign * 4;
+        h.rate = 0;
+        goal.update(h, 0, speed, 220);
+        assert(!goal.approachingStop && speed[1] * sign > 0);
+        h.rate = sign * 30;
+        goal.update(h, 0, speed, 240);
+        assert(!goal.close() && goal.approachingStop && speed[1] == 0);
+        h.degrees += sign * 7; // crosses the full tolerance band between samples
+        goal.update(h, 0, speed, 260);
+        assert(goal.approachingStop && speed[0] == 0);
+        h.rate = 0;
+        h.at = 280;
+        assert(!goal.rested(h, true));
+        assert(!goal.rested(h, true)); // same IMU sample
+        h.at += 100;
+        h.rate = sign * 4;
+        assert(!goal.rested(h, true));
+        h.rate = 0;
+        h.at += 20;
+        assert(!goal.rested(h, true));
+        h.at += 149;
+        assert(!goal.rested(h, true));
+        h.at++;
+        assert(goal.rested(h, true) && !goal.close()); // settled outside: correction required
+        h.degrees -= sign * 3;
+        goal.update(h, 0, speed, h.at);
+        assert(!goal.rested(h, true));
+        h.at += 150;
+        assert(goal.rested(h, true) && goal.close());
         goal.begin(sign * 500, false, h, 200);
         h.degrees += 4;
         goal.update(h, 0, speed, 300);

@@ -201,6 +201,7 @@ void startNetwork(const char *name, const char *pass, void (*stopMotion)()) {
     live.savedName = saved.ssid;
     WiFi.persistent(false);
     WiFi.mode(WIFI_AP_STA);
+    WiFi.setSleep(false);  // Keep the station awake for short control-window heartbeats.
     WiFi.setAutoReconnect(false);
     startAp();
     if (saved.ssid[0]) join(saved, false);
@@ -208,7 +209,8 @@ void startNetwork(const char *name, const char *pass, void (*stopMotion)()) {
 }
 
 bool consoleOrigin(const String &origin) {
-    return origin == "http://127.0.0.1:8765" || origin == "http://localhost:8765";
+    return origin == "http://127.0.0.1:8765" || origin == "http://localhost:8765" ||
+           origin == "http://whistle-console.localhost";
 }
 
 const char *networkCommand(const String &op, JsonDocument &q, JsonDocument &r, bool localSetup) {

@@ -1,0 +1,17 @@
+{
+  "name": "whistle-bot-esp32-android",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/console.test.cjs",
+    "android:sync": "cap sync android",
+    "android:build": "npm run android:sync && cd android && ./gradlew assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "playwright": "1.62.1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2"
+  }
+}

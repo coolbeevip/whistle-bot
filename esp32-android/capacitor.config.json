@@ -1,0 +1,9 @@
+{
+  "appId": "io.whistlebot.console",
+  "appName": "Whistle Bot",
+  "webDir": "www",
+  "server": {
+    "hostname": "whistle-console.localhost",
+    "androidScheme": "http"
+  }
+}

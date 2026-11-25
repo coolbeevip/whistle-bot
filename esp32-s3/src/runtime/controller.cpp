@@ -67,11 +67,16 @@ void publish() {
 void stop(const char *why, uint32_t now, const char *outcome = "cancelled") {
     if (s.running) {
         s.actionState = outcome;
+        s.actionReason = why;
+        if (s.gyroAction && heading.fresh(now))
+            s.yawProgress = float(heading.degrees - precisionGoal.origin);
         portENTER_CRITICAL(&lock);
         for (auto &h : history)
             if (h.id == s.action) {
                 h.state = outcome;
                 h.reason = why;
+                h.yaw = s.yawProgress;
+                h.coast = s.coast;
                 h.goal = s.goal;
             }
         portEXIT_CRITICAL(&lock);
@@ -134,7 +139,7 @@ Result execute(const Command &c, uint32_t now) {
     if (!s.owner || c.session != s.owner || c.lease != s.lease)
         return {"NOT_OWNER"};
     if (c.op == Op::Release || (c.op == Op::CalCancel && s.cal)) {
-        stop(c.op == Op::Release ? "released" : "cal_cancel", now);
+        stop(c.op == Op::Release ? c.releaseReason : "cal_cancel", now);
         return {};
     }
     if (s.leaseMode == LeaseMode::Precision && c.op != Op::Move && c.op != Op::Turn && c.op != Op::Beat) return {"MODE"};
@@ -262,15 +267,22 @@ Result execute(const Command &c, uint32_t now) {
             return {"CAL_REQUIRED"};
         if (!trial && !s.yawReady) return {"IMU_NOT_READY"};
         s.gyroAction = !trial;
+        s.actionTarget = c.value;
+        s.turnAction = c.turn;
+        s.coast = {};
+        s.actionReason = "running";
         s.yawProgress = 0;
         if (!trial) precisionGoal.begin(c.value, c.turn, heading, now);
         s.manualDir[0] = s.manualDir[1] = 0;
         s.action = ++nextAction;
         portENTER_CRITICAL(&lock);
         History &h = history[cursor++ % 16];
+        h = {};
         strlcpy(h.key, c.key, sizeof(h.key));
         h.id = s.action;
         h.turn = c.turn;
+        h.gyro = !trial;
+        h.yaw = 0;
         h.session = c.session;
         h.target = c.value;
         h.state = "running";
@@ -333,7 +345,8 @@ void tick(uint32_t now) {
     if (replied) {
         uint32_t previousDeadline = expires;
         result = urgent ? Result{"STOPPED"} : execute(cmd, now);
-        if (cmd.op == Op::Drive || cmd.op == Op::DriveLow || cmd.op == Op::Twist) {
+        if (cmd.op == Op::Drive || cmd.op == Op::DriveLow || cmd.op == Op::Twist ||
+            (cmd.op == Op::Beat && s.leaseMode == LeaseMode::Precision)) {
             portENTER_CRITICAL(&lock);
             if (cmd.lease && cmd.lease == timingLease) {
                 linkTiming.driveWindow = cmd.window;
@@ -356,13 +369,26 @@ void tick(uint32_t now) {
         float distance = (s.goal.actual[0] + s.goal.actual[1]) * 0.5f;
         precisionGoal.update(heading, distance, s.wheelSpeed, now);
         s.yawProgress = precisionGoal.yaw;
-        if (precisionGoal.close() && !braking) {
+        if ((precisionGoal.close() || precisionGoal.approachingStop) && !braking) {
             braking = true;
+            precisionGoal.observingRest = false;
+            if (precisionGoal.turn && !s.coast.started) {
+                s.coast.started = true;
+                s.coast.startYaw = precisionGoal.yaw;
+                s.coast.startRate = heading.rate;
+            }
             finishAt = now;
         }
         if (braking) {
             s.wheelSpeed[0] = s.wheelSpeed[1] = 0;
-            if (elapsed(now, finishAt, 150) && f.settled(now) && std::abs(heading.rate) < 3.f) {
+            const bool rested = precisionGoal.turn ? precisionGoal.rested(heading, f.settled(now))
+                : f.settled(now) && std::abs(heading.rate) < 3.f;
+            if (elapsed(now, finishAt, 150) && rested) {
+                if (s.coast.started && !s.coast.settled) {
+                    s.coast.settled = true;
+                    s.coast.travel = precisionGoal.yaw - s.coast.startYaw;
+                    s.coast.untilSettledMs = now - finishAt;
+                }
                 if (precisionGoal.close()) stop("target", now, "completed");
                 else if (++precisionGoal.corrections > 2) stop("overshoot", now, "failed");
                 else {
@@ -400,6 +426,7 @@ void tick(uint32_t now) {
                 s.draft.checks |= history[(cursor - 1) % 16].turn ? 2u : 1u;
                 s.running = false;
                 s.actionState = "completed";
+                s.actionReason = "target";
                 braking = false;
                 trial = false;
                 portENTER_CRITICAL(&lock);
@@ -696,14 +723,17 @@ void stopSession(uint32_t session) {
     portEXIT_CRITICAL(&lock);
     xTaskNotifyGive(runner);
 }
-bool lookupAction(const char *key, ActionRecord &record) {
+bool lookupAction(const char *key, uint32_t id, ActionRecord &record) {
     bool found = false;
     portENTER_CRITICAL(&lock);
     for (const auto &h : history)
-        if (h.id && strcmp(h.key, key) == 0) {
+        if (h.id && (key ? strcmp(h.key, key) == 0 : h.id == id)) {
             record = h;
-            if (published.action == h.id && published.running)
+            if (published.action == h.id && published.running && !strcmp(h.state, "running")) {
                 record.goal = published.goal;
+                record.yaw = published.yawProgress;
+                record.coast = published.coast;
+            }
             found = true;
             break;
         }

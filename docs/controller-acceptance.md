@@ -1,11 +1,11 @@
-# ESP32-S3 独立控制台验收
+# ESP32 Android 应用验收
 
 ## 浏览器回归测试
 
 在开发机安装 Node.js 22，从仓库根目录执行以下命令。GitHub Actions 在每次推送和拉取请求时运行同一套测试。
 
 ```sh
-cd esp32-console
+cd esp32-android
 npm ci
 npx playwright install chromium
 npm test
@@ -23,16 +23,16 @@ npm test
 
 ## 真机验收
 
-将电脑连到小车热点，或在同一局域网使用 ESP32 的实际 IP。先在控制台目录运行 `npm start`，再从同目录的另一终端运行以下命令，通过本地网页读取真机编码器遥测，检查驾驶、标定及设置页能否切换。
+在手机上[安装调试 APK](../esp32-android/README.md)，打开 Whistle Bot，连接小车并停在驾驶页。将开启 USB 调试的手机连接电脑，在 `esp32-android/` 中运行以下命令。脚本通过 ADB 连接前台应用的 WebView，检查遥测与页面切换。
 
 ```sh
-node test/live.cjs http://192.168.4.1/
+node test/live.cjs
 ```
 
 **四向动力检查**需要先架空两只驱动轮，接通驱动板电源，并退出其他驾驶会话。显式增加参数后，脚本用 0.2 m/s 档逐一按下四个方向键，根据两轮编码器速度的符号判断方向，每次松手并按 Stop，确认控制权释放、底盘静止且左右 PWM 为零后才继续下一项。
 
 ```sh
-node test/live.cjs http://192.168.4.1/ --wheels-lifted
+node test/live.cjs --wheels-lifted
 ```
 
 **地面精度**需要外部量具。将车放在平整地面，用胶带标出起点与车头方向，分别执行前进和后退 0.25 m、左转和右转 45°。每次从标记处开始，记录实测距离或角度、页面完成状态和偏差，按项目实际精度要求判定。另起一次前进动作，中途按 Stop 并确认停车。重新标定时，用尺量轮胎一周的距离，用地面标记量试转角度，逐项保存并刷新页面核对状态。

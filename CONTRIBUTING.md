@@ -17,7 +17,7 @@ python -m pip install pyserial -r raspberry-pi/requirements.txt
 sh tools/check.sh
 ```
 
-ESP32 独立控制台的手机触控、精确运动、标定和停车行为由浏览器验收测试覆盖。安装、运行与真机检查见[控制台验收](docs/controller-acceptance.md)。
+Android 应用的手机触控、精确运动、标定和停车行为由浏览器验收测试覆盖。安装、运行与真机检查见[控制台验收](docs/controller-acceptance.md)。
 
 修改固件或其依赖后，编译 ESP32-S3 控制器固件。
 
@@ -25,7 +25,7 @@ ESP32 独立控制台的手机触控、精确运动、标定和停车行为由�
 pio run -d esp32-s3
 ```
 
-底盘调试控制台开发从 `esp32-console/` 开始。树莓派网页开发从 `raspberry-pi/index.html` 和同目录的 `static/` 开始。在目标树莓派启动服务的步骤见[安装说明](docs/installation.md)。提交界面变更时附手机截图，并说明横竖屏与触控检查结果。提交运动控制变更时区分宿主机模拟、架空测试和落地测量，并记录适用的电机通道与标定状态。
+Android 应用开发从 `esp32-android/` 开始。树莓派网页开发从 `raspberry-pi/index.html` 和同目录的 `static/` 开始。在目标树莓派启动服务的步骤见[安装说明](docs/installation.md)。提交界面变更时附手机截图，并说明横竖屏与触控检查结果。提交运动控制变更时区分宿主机模拟、架空测试和落地测量，并记录适用的电机通道与标定状态。
 
 ## 发布
 

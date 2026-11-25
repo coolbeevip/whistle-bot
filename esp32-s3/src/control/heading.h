@@ -61,6 +61,8 @@ struct PrecisionGoal {
     uint32_t progressAt = 0;
     bool turn = false;
     unsigned corrections = 0;
+    bool approachingStop = false, observingRest = false, restInside = false;
+    uint32_t restSince = 0;
 
     void begin(float value, bool turning, const Heading &h, uint32_t now) {
         *this = {};
@@ -74,16 +76,24 @@ struct PrecisionGoal {
 
     void update(const Heading &h, float meanTravel, int speed[2], uint32_t now) {
         yaw = float(h.degrees - origin);
+        float previousError = error;
         error = target - (turn ? yaw : meanTravel);
         if (std::abs(error) + tolerance * 0.5f < bestError) {
             bestError = std::abs(error);
             progressAt = now;
         }
-        float base = std::copysign(std::clamp(std::abs(error) * 1.8f, 9.f, 60.f), error);
+        float remaining = std::abs(error);
         if (turn) {
-            speed[1] = std::lround(base);
+            // Initial stopping-time estimate; tune from measured coast on the floor.
+            constexpr float coastSeconds = 0.10f;
+            float closingRate = error >= 0 ? h.rate : -h.rate;
+            remaining -= std::max(0.f, closingRate) * coastSeconds;
+            approachingStop = remaining <= tolerance || previousError * error < 0;
+            float limit = corrections ? 24.f : 60.f;
+            speed[1] = approachingStop ? 0 : std::lround(std::copysign(std::clamp(remaining * 1.8f, 9.f, limit), error));
             speed[0] = -speed[1];
         } else {
+            float base = std::copysign(std::clamp(remaining * 1.8f, 9.f, 60.f), error);
             float bound = std::min(18.f, std::abs(base) * 0.5f);
             float trim = std::clamp(1.8f*yaw + 0.22f*h.rate, -bound, bound);
             speed[0] = std::lround(base + trim);
@@ -91,4 +101,16 @@ struct PrecisionGoal {
         }
     }
     bool close() const { return std::abs(error) <= tolerance; }
+    bool rested(const Heading &h, bool wheelsStill) {
+        if (!wheelsStill || std::abs(h.rate) >= 3.f) {
+            observingRest = false;
+            return false;
+        }
+        if (!observingRest || restInside != close()) {
+            observingRest = true;
+            restInside = close();
+            restSince = h.at;
+        }
+        return uint32_t(h.at - restSince) >= 150;
+    }
 };
