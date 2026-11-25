@@ -126,6 +126,10 @@ function disengage(reason) {
     guarded(() => releaseMine(reason));
   }
 }
+landscape.addEventListener("change", () => {
+  if (landscape.matches) disengage("landscape");
+  render();
+});
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) disengage("page_hidden");
 });
@@ -222,6 +226,9 @@ function renderGoal(active) {
       String(target.value === target.presets[i]),
     );
   });
+  const gearLabel = $("moveGear");
+  gearLabel.hidden = goalKind !== "distance" || !speedLimits.capabilities?.includes("move_speed") || !session;
+  gearLabel.textContent = "G" + (selectedGear + 1) + " · " + gearSpeed(selectedGear).toFixed(2) + " m/s";
   $("goalValue").value = displayGoal(target.value);
   for (const button of [...kindButtons, ...dirButtons, ...presetButtons])
     button.disabled = active;
@@ -300,6 +307,8 @@ function goal() {
   return {
     turn,
     [turn ? "angle_deg" : "distance_mm"]: sign * target.value,
+    ...(!turn && speedLimits.capabilities?.includes("move_speed")
+      ? {speed_mm_s: Math.round(gearSpeed(selectedGear) * 1000)} : {}),
     request_key: session + "-" + id + "-" + Date.now(),
   };
 }

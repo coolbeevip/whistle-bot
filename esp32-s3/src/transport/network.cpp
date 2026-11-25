@@ -223,13 +223,14 @@ const char *networkCommand(const String &op, JsonDocument &q, JsonDocument &r, b
         r["scan_state"] = published.scanState;
         r["busy"] = published.working;
         r["setup_allowed"] = localSetup;
+        r["scan_allowed"] = true;
         r["message"] = published.message;
         auto names = r["networks"].to<JsonArray>();
         for (unsigned i=0; i<published.count; ++i) names.add(published.networks[i]);
         xSemaphoreGive(stateLock);
         return nullptr;
     }
-    if (!localSetup) return "HOTSPOT_REQUIRED";
+    if (!localSetup && op != "wifi_scan") return "HOTSPOT_REQUIRED";
     if (snapshot().owner) return "BUSY";
     Request request{};
     if (op == "wifi_test") {

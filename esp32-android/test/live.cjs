@@ -27,9 +27,12 @@ async function run() {
     await p.locator("#imuReadings").waitFor();
     await p.locator("[data-drive-panel=actions]").click();
     await p.locator("#goalValue").waitFor();
-    await p.locator("button[data-page=cal]").click();
-    await p.locator("[data-stage=mapping]").waitFor();
     await p.locator("#settingsButton").click();
+    await p.locator("[data-panel=chassisPanel]").click();
+    await p.locator("#openCalibration").click();
+    await p.locator("[data-stage=mapping]").waitFor();
+    await p.locator("#calBack").click();
+    await p.locator("[data-panel=wifiPanel]").click();
     await p.locator("#networkStatus").waitFor();
     await p.locator("button[data-page=drive]").click();
     await p.locator("[data-drive-panel=manual]").click();

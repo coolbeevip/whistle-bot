@@ -2,6 +2,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+const landscape = matchMedia("(orientation: landscape)");
 const pending = new Map();
 let ws,
   session = 0,
@@ -17,7 +18,7 @@ let pointer = null, acceptedAt = null, lastDriveAt = 0;
 let queryPending = false,
   lastSample = 0;
 let page = "drive", drivePanel = "manual", stage = "", samplingNow = false;
-const titles = {mapping:"Wheel directions", distance:"Distance", turn:"Turn angle"};
+const titles = {mapping:"Wheel directions", distance:"Distance", turn:"Effective track width"};
 const savedParams = () => last.saved_calibration || last.calibration;
 function stageState(c, key) {
   if (!c) return "Loading…";
@@ -153,12 +154,13 @@ function render() {
   $("precisionStop").disabled = $("padStop").disabled = $("stop").disabled = !session;
   const precision = drivePanel === "actions";
   const summary = document.querySelector(".drive-summary");
-  const summaryHost = page === "drive" && precision ? $("precisionControls") : document.querySelector("main");
+  const drivingView = page === "drive" && !landscape.matches;
+  const summaryHost = drivingView && precision ? $("precisionControls") : document.querySelector("main");
   if (summary.parentElement !== summaryHost) summaryHost.prepend(summary);
-  const statusHost = page === "drive" && !precision ? $("stickFooter") : document.querySelector(".toolbar");
+  const statusHost = drivingView && !precision ? $("stickFooter") : document.querySelector(".toolbar");
   const statusSlot = $("availability").parentElement;
   if (statusSlot.parentElement !== statusHost) statusHost.prepend(statusSlot);
-  $("stop").hidden = page === "drive";
+  $("stop").hidden = drivingView;
   const canInterrupt = !!session && (busy || mode === "action" || last.action_state === "running" || last.settled === false);
   $("precisionStop").hidden = !canInterrupt;
   $("execute").hidden = canInterrupt;
@@ -168,40 +170,45 @@ function render() {
     button.setAttribute("aria-pressed", String(selected));
     button.disabled = !selected && (!!lease || !!held || busy);
   }
-  renderGoal(canInterrupt);
   const turning = goalKind === "angle";
   const actionReady = last.precision_ready ?? (turning ? last.calibrated : last.distance_ready);
-  $("acceleration").hidden = $("speedSetting").hidden = page !== "drive" || precision || !last.manual_ready;
+  $("acceleration").hidden = $("speedSetting").hidden = page !== "drive" || precision;
   if (session && last.manual_ready) {
     const maxMm = last.distance_ready ? last.manual_max_mm_s : speedLimits.basic_ticks_max * nominalMean;
     speedCeiling = Math.max(0.01, Math.floor(maxMm / 10) / 100);
-    showGears();
   }
+  showGears();
+  renderGoal(canInterrupt);
   showActual(ready);
   for (const b of dirs)
     b.disabled = !(
       ready &&
-      last.manual_ready &&
+      !landscape.matches && last.manual_ready &&
       (!ownerMessage(last.owner) && !busy && (!mode || mode === "manual" || mode === "claim"))
     );
   $("execute").disabled = !(
     ready &&
-    actionReady &&
+    !landscape.matches && actionReady &&
     free &&
     last.settled &&
     !busy
   );
   const saved = savedParams();
-  for (const tab of document.querySelectorAll("button[data-page]")) {
-    const selected = tab.dataset.page === page;
-    $(tab.dataset.page).hidden = !selected;
+  const navigationLocked = !!lease || !!held || busy;
+  for (const id of ["drive", "settings", "cal"]) $(id).hidden = page !== id;
+  for (const tab of document.querySelectorAll("nav [data-page]")) {
+    const selected = tab.dataset.page === (page === "cal" ? "settings" : page);
     tab.setAttribute("aria-current", selected ? "page" : "false");
-    tab.disabled = !selected && (!!lease || !!held || busy);
+    tab.disabled = navigationLocked && tab.dataset.page !== page;
   }
+  $("calBack").disabled = navigationLocked;
+  const needsCalibration = !last.distance_ready || (turning && last.precision_ready == null && !last.calibrated);
+  $("precisionCalibration").hidden = !(page === "drive" && precision && ready && free &&
+    last.settled && !navigationLocked && !actionReady && needsCalibration);
   $("availability").textContent = !session ? "Waiting for connection" : !fresh ? "Telemetry delayed" : !ready ? (page === "drive" && precision ? "" : "Motor driver offline") :
-    page === "settings" ? "Network settings" : stage ? titles[stage] : ownerMessage(last.owner) ? ownerMessage(last.owner) :
+    page === "settings" ? "Network settings" : stage ? "" : ownerMessage(last.owner) ? ownerMessage(last.owner) :
     mode === "manual" ? "Driving" : mode === "claim" ? "Getting ready" : last.owner === "self" ? "This device has control" : !last.settled ? "Waiting for wheels to stop" :
-    page === "drive" && precision && !actionReady ? (last.yaw_ready === false ? "Keep the IMU still on level ground" : turning && last.precision_ready == null ? "Verify distance and angle calibration" : "Verify distance calibration") :
+    page === "drive" && precision && !actionReady ? (!last.distance_ready ? (saved?.mapped ? "Verify distance calibration" : "Set wheel directions first") : last.yaw_ready === false ? "Keep the IMU still on level ground" : turning && last.precision_ready == null ? "Verify distance and angle calibration" : "Verify distance calibration") :
     !last.manual_ready ? "Set wheel directions first" : "";
   $("overview").hidden = !!stage || !$("trialResult").hidden;
   $("wizard").hidden = !stage;
@@ -211,7 +218,7 @@ function render() {
     const missing = key === "distance" && !saved?.mapped ? "Save wheel directions first" :
       key === "turn" && !saved?.left_mm_tick ? "Save distance first" : "";
     $(key+"State").textContent = missing || stageState(saved,key);
-    button.disabled = !!missing || !ready || !free || !last.settled || busy;
+    button.disabled = landscape.matches || !!missing || !ready || !free || !last.settled || busy;
   }
   if (stage) {
     const c = last.calibration;
@@ -222,7 +229,7 @@ function render() {
     $("spin").disabled = !samplingNow;
     $("trial").disabled = !available || samplingNow || active || !last.settled;
     $("save").disabled = (stage !== "mapping" && !available) || samplingNow || active || !last.settled;
-    $("jogTicks").textContent = "M3 ticks " + last.m3_ticks + " · M4 ticks " + last.m4_ticks;
+    $("jogTicks").textContent = "M3 ticks " + (last.m3_ticks ?? "—") + " · M4 ticks " + (last.m4_ticks ?? "—");
     $("stageStatus").textContent = samplingNow ? "Sampling" : active ? "Test in progress" :
       stage === "mapping" ? "Save to apply these directions" : last.action_state === "failed" && last.reason !== "ready" ? "Test failed · " + last.reason : !available ? "Ready to sample" :
       c.checks & (stage === "turn" ? 2 : 1) ? "Test passed. Ready to save." : "Save these values or run a test.";
@@ -252,7 +259,7 @@ function render() {
       Number(c.left_mm_tick).toFixed(3) +
       " / " +
       Number(c.right_mm_tick).toFixed(3) +
-      " mm/ticks · track width " +
+      " mm/tick · track width " +
       Number(c.track_mm).toFixed(1) +
       " mm";
   let progress = last.action_id ? "Movement · " + last.action_state : "";

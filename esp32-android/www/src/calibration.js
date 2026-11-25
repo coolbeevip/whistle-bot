@@ -20,13 +20,13 @@ for (const button of document.querySelectorAll("[data-stage]")) {
       $("spin").hidden = !turn;
       $("instructions").textContent = turn ?
         "Put the rover on the ground and mark its heading. Start sampling, hold Jog left, then enter the measured angle. Left turns are positive." :
-        "Lift both wheels. Start sampling and turn each wheel one full revolution forward. For 67.5 mm tires, enter 212 mm. After recalculating distance, repeat the turn test.";
+        "Lift both wheels. Start sampling and turn each wheel one full revolution forward. For 67.5 mm tires, enter 212 mm. If you use effective track width, repeat its test after changing the distance scale.";
       $("measureLabel").textContent = turn ? "Measured angle" : "Measured distance";
       $("measureUnit").textContent = $("trialUnit").textContent = turn ? "deg" : "mm";
       $("measure").value = turn ? 90 : 212;
       $("trialLabel").textContent = turn ? "Left turn target" : "Forward target";
       $("trialAmount").value = turn ? 90 : 200;
-      $("save").textContent = "Save " + titles[stage];
+      $("save").textContent = "Save";
       say("");
     } finally { busy = false; render(); }
   });

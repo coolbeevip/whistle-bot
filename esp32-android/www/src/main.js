@@ -61,4 +61,5 @@ setInterval(async () => {
     queryPending = false;
   }
 }, 100);
+showGears();
 connect();

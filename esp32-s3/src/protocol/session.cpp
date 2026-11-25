@@ -152,6 +152,10 @@ const char *decode(JsonDocument &d, const String &op, Command &c) {
     else if (op == "move_distance" || op == "turn_angle") {
         c.turn = op == "turn_angle";
         c.op = c.turn ? Op::Turn : Op::Move;
+        if (!c.turn && !d["speed_mm_s"].isNull()) {
+            if (!integer(d["speed_mm_s"], 1, board::maxManualMmPerSecond)) return "RANGE";
+            c.moveSpeed = d["speed_mm_s"].as<int>();
+        }
     } else if (op == "cal_sample") {
         String kind = d["step"] | "";
         if (kind == "jog") {
@@ -241,7 +245,7 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
         r["max_abs_mm_s"] = state.saved.manualSpeedLimit();
         r["max_twist_mm_s"] = board::maxSpeed;
         auto caps = r["capabilities"].to<JsonArray>();
-        for (auto name : {"imu_probe", "drive", "drive_low", "drive_twist", "drive_log", "wheel_odom", "encoders", "calibration", "move_distance", "turn_angle"})
+        for (auto name : {"imu_probe", "drive", "drive_low", "drive_twist", "drive_log", "wheel_odom", "encoders", "calibration", "move_distance", "move_speed", "turn_angle"})
             caps.add(name);
         if (state.lidar.installed)
             caps.add("lidar_sectors");

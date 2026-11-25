@@ -23,6 +23,9 @@ $("boardHost").oninput = () => $("boardHost").setCustomValidity("");
 function call(op, fields = {}, timeout = op.startsWith("wifi_") ? 3000 : 700) {
   if (!ws || ws.readyState !== 1 || (!session && op !== "hello"))
     return Promise.reject(Error("Disconnected"));
+  if (landscape.matches && (["claim", "cal_begin", "drive", "drive_low", "move_distance", "turn_angle", "heartbeat"].includes(op) ||
+      (op === "cal_sample" && ["trial", "jog"].includes(fields.step))))
+    return Promise.reject(Error("Rotate to portrait to operate the rover."));
   const n = ++id,
     packet = { v: 1, id: n, op, ...fields };
   if (session) packet.session = session;

@@ -38,7 +38,7 @@ class Controller {
     const reject = error => this.send({id: m.id, ok: false, error, owner: this.state.owner});
     if (m.op !== "hello" && m.session !== 41) return reject("BAD_SESSION");
     switch (m.op) {
-      case "hello": return reply({session: 41, basic_ticks_max: 9000, capabilities: []});
+      case "hello": return reply({session: 41, basic_ticks_max: 9000, capabilities: ["move_speed"]});
       case "status": return reply(this.snapshot());
       case "subscribe": return reply();
       case "wifi_status": return reply(this.net);

@@ -81,5 +81,16 @@ int main() {
         assert(speed[0] > speed[1] && speed[0]*sign > 0 && speed[1]*sign > 0);
         goal.update(h, sign * 500, speed, 500);
         assert(goal.close());
+
+        goal.begin(sign * 1000, false, h, 0, 400);
+        goal.update(h, 0, speed, 0);
+        assert(speed[0] == sign * 400 && speed[1] == sign * 400);
+        goal.update(h, sign * 900, speed, 1000);
+        assert(speed[0] * sign > 0 && speed[0] * sign < 250);
+        goal.update(h, sign * 990, speed, 1500);
+        assert(speed[0] == sign * 18 && speed[1] == sign * 18);
+        goal.begin(sign * 50, false, h, 0, 800);
+        goal.update(h, 0, speed, 0);
+        assert(speed[0] == sign * 90);
     }
 }

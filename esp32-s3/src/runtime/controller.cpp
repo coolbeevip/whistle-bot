@@ -47,6 +47,7 @@ WheelLoop wheel[2];
 WheelRates rates;
 uint32_t lastStep, lastProgress[2]{};
 struct History : ActionRecord {
+    int moveSpeed = 0;
     char key[41]{};
 };
 History history[16];
@@ -156,7 +157,7 @@ Result execute(const Command &c, uint32_t now) {
     if (c.op == Op::Move || c.op == Op::Turn || c.op == Op::Trial) {
         for (const auto &record : history)
             if (record.id && strcmp(record.key, c.key) == 0)
-                return record.session == c.session && record.turn == c.turn && record.target == c.value
+                return record.session == c.session && record.turn == c.turn && record.target == c.value && record.moveSpeed == c.moveSpeed
                            ? Result{nullptr, record.id}
                            : Result{"CONFLICT"};
     }
@@ -266,13 +267,14 @@ Result execute(const Command &c, uint32_t now) {
         if (trial ? !(c.turn ? cal.valid() : cal.distanceValid()) : !cal.distanceReady())
             return {"CAL_REQUIRED"};
         if (!trial && !s.yawReady) return {"IMU_NOT_READY"};
+        if (c.moveSpeed > cal.manualSpeedLimit()) return {"RANGE"};
         s.gyroAction = !trial;
         s.actionTarget = c.value;
         s.turnAction = c.turn;
         s.coast = {};
         s.actionReason = "running";
         s.yawProgress = 0;
-        if (!trial) precisionGoal.begin(c.value, c.turn, heading, now);
+        if (!trial) precisionGoal.begin(c.value, c.turn, heading, now, c.moveSpeed);
         s.manualDir[0] = s.manualDir[1] = 0;
         s.action = ++nextAction;
         portENTER_CRITICAL(&lock);
@@ -285,6 +287,7 @@ Result execute(const Command &c, uint32_t now) {
         h.yaw = 0;
         h.session = c.session;
         h.target = c.value;
+        h.moveSpeed = c.moveSpeed;
         h.state = "running";
         h.reason = "running";
         portEXIT_CRITICAL(&lock);
@@ -444,8 +447,9 @@ void tick(uint32_t now) {
     const int basicRate = requestedTicks ? requestedTicks : board::basicTicksPerSecond;
     const bool manualSpeed = !basic && !s.running && !s.cal && s.owner &&
                              (s.wheelSpeed[0] || s.wheelSpeed[1]);
-    const bool wheelRateLoop = (raw && requestedTicks) || manualSpeed;
-    const bool responsive = wheelRateLoop && responsiveDrive;
+    const bool gearedMove = s.running && s.gyroAction && !s.turnAction && precisionGoal.moveSpeed > 0;
+    const bool wheelRateLoop = (raw && requestedTicks) || manualSpeed || gearedMove;
+    const bool responsive = wheelRateLoop && !gearedMove && responsiveDrive;
     const int outputLimit = wheelRateLoop ? board::driverPwmRange : (basic ? board::manualPwm : 650);
     float demand[2];
     float unitsPerTick[2];
@@ -490,11 +494,12 @@ void tick(uint32_t now) {
     }
     int out[2]{};
     for (int i = 0; i < 2; ++i) {
-        float baseRate = (raw || manualSpeed) ? board::defaultBasicTicks * unitsPerTick[i] : board::referenceMmPerSecond;
+        float baseRate = (raw || manualSpeed || gearedMove) ? board::defaultBasicTicks * unitsPerTick[i] : board::referenceMmPerSecond;
         float measured = s.measuredTicks[i] * unitsPerTick[i] / baseRate;
         float target = s.owner ? demand[i] / baseRate : 0;
-        int power = wheel[i].step(target, measured, dt, (responsive ? 480.f : 160.f) / board::referenceMmPerSecond,
-                                  outputLimit, raw || manualSpeed);
+        float slew = gearedMove ? PrecisionGoal::moveAcceleration / baseRate
+                                : (responsive ? 480.f : 160.f) / board::referenceMmPerSecond;
+        int power = wheel[i].step(target, measured, dt, slew, outputLimit, raw || manualSpeed || gearedMove);
         if (!target || measured * wheel[i].reference > 0 || (!s.running && std::abs(wheel[i].reference) < 0.1f))
             lastProgress[i] = now;
         // Near the goal a small speed demand can leave both motors below breakaway PWM.

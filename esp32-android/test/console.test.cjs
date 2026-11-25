@@ -169,6 +169,7 @@ for (const [kind, op, key, value] of [
   ["left","turn_angle","angle_deg",45], ["right","turn_angle","angle_deg",-45]]) {
   test("Precision: " + kind, async t => {
     const {p,board,packet} = await open(t);
+    await p.locator('[data-gear="0"]').tap();
     await p.getByRole("button",{name:"Precision"}).tap();
     if (key === "angle_deg") {
       await p.getByRole("button",{name:"Turn",exact:true}).tap();
@@ -183,6 +184,7 @@ for (const [kind, op, key, value] of [
     await p.locator("#execute").tap();
     const command = await packet(op,{[key]:value});
     await packet("claim", {precision:true});
+    assert.equal(command.speed_mm_s, key === "distance_mm" ? 200 : undefined);
     assert.ok(command.request_key);
     await p.getByText("Movement · running").waitFor();
     await packet("heartbeat",{lease:command.lease});
@@ -199,7 +201,13 @@ for (const [kind, op, key, value] of [
 }
 
 async function enterStage(p, stage) {
-  await p.locator("[data-page=cal]:is(button)").tap();
+  if (await p.locator("#cal").isHidden()) {
+    await p.locator("#settingsButton").tap();
+    await p.locator("[data-panel=chassisPanel]").tap();
+    await p.locator("#openCalibration").tap();
+  }
+  if (stage === "turn" && await p.locator("[data-stage=turn]").isHidden())
+    await p.locator("#overview summary").tap();
   await p.locator(`[data-stage="${stage}"]`).tap();
   await p.locator("#wizard").waitFor();
 }
@@ -253,6 +261,16 @@ for (const turn of [false,true]) {
   });
 }
 
+test("Joystick gear selection remains available when the board disconnects", async t => {
+  const {p, board} = await open(t);
+  board.socket.close();
+  await p.locator("#connection").getByText("Disconnected").waitFor();
+  assert.equal(await p.locator("[data-gear]:visible").count(), 4);
+  await p.locator('[data-gear="2"]').tap();
+  assert.equal(await p.locator('[data-gear="2"]').getAttribute("aria-pressed"), "true");
+  assert.ok(await p.locator(".up").isDisabled());
+});
+
 test("Locks, disconnect and reconnect", async t => {
   const {p,board} = await open(t,b => { b.state.owner = "usb"; });
   assert.ok(await p.locator(".up").isDisabled());
@@ -268,12 +286,25 @@ test("Locks, disconnect and reconnect", async t => {
   assert.equal(board.packets.some(m => ["claim","drive","drive_low"].includes(m.op)),false);
 });
 
+test("LAN scan lists networks while credential changes require the rover hotspot", async t => {
+  const {p, packet} = await open(t, board => Object.assign(board.net, {
+    setup_allowed:false, scan_allowed:true, hotspot:"Whistle-Test"
+  }));
+  await p.locator("#settingsButton").tap();
+  await p.locator("#scanWifi").tap();
+  await packet("wifi_scan");
+  await p.locator("#nearby").selectOption("Test AP");
+  assert.equal(await p.locator("#homeName").inputValue(), "Test AP");
+  assert.ok(await p.locator("#testWifi").isDisabled());
+  assert.ok(await p.locator("#homePass").isDisabled());
+});
+
 test("Settings: scan, select, save, forget and hotspot recovery", async t => {
   const {p,packet} = await open(t);
   await p.locator("#settingsButton").tap();
   await p.locator("#scanWifi").tap();
   await packet("wifi_scan");
-  await p.getByRole("button",{name:"Test AP"}).tap();
+  await p.locator("#nearby").selectOption("Test AP");
   await p.fill("#homePass","fixture-only");
   await p.getByRole("button",{name:"Show password"}).tap();
   assert.equal(await p.locator("#homePass").getAttribute("type"),"text");
@@ -493,7 +524,7 @@ test("Narrow layout keeps related drive controls on one line", async t => {
   assert.ok(await p.locator("#speedSetting").isHidden());
   await sameRow(["[data-nudge='-10']", "#goalValue", "[data-nudge='10']"]);
   await p.getByRole("button",{name:"Settings"}).tap();
-  await sameRow(["#homeName","#scanWifi"]);
+  await sameRow(["#nearby","#scanWifi"]);
   await sameRow(["#homePass","#showPass"]);
   await p.locator("#controllerPanel summary").tap();
   await sameRow(["#boardHost","#boardForm button"]);
@@ -597,3 +628,48 @@ test("A silent open socket expires and telemetry resumes without replaying movem
   await until(async () => await p.locator(".up").isEnabled(), "fresh feedback after reconnect");
   assert.ok(board.packets.slice(start).every(m => ["hello","status","subscribe"].includes(m.op)));
 });
+
+test("Precision links to calibration when distance verification is missing", async t => {
+  const {p} = await open(t, board => Object.assign(board.state, {
+    distance_ready:false, precision_ready:false, yaw_ready:false
+  }));
+  await p.locator("[data-drive-panel=actions]").tap();
+  await p.getByText("Verify distance calibration", {exact:true}).waitFor();
+  await p.locator("#precisionCalibration").tap();
+  assert.equal(await p.locator("#settingsButton").getAttribute("aria-current"), "page");
+  assert.ok(await p.locator("[data-stage=turn]").isHidden());
+  await p.locator("#calBack").tap();
+  assert.ok(await p.locator("#openCalibration").isVisible());
+});
+
+for (const control of ["manual", "precision", "calibration"]) {
+  test("Rotating releases " + control + " and requires a new portrait input", async t => {
+    const {p, board, packet} = await open(t);
+    if (control === "manual") {
+      await p.locator(".up").focus();
+      await p.keyboard.down("Space");
+      await packet("drive");
+    } else if (control === "precision") {
+      await p.locator("[data-drive-panel=actions]").tap();
+      await p.locator("#execute").tap();
+      await packet("move_distance");
+    } else {
+      await enterStage(p, "distance");
+      await p.locator("#trial").tap();
+      await packet("cal_sample", {step:"trial"});
+    }
+    await p.setViewportSize({width:844,height:390});
+    // Hiding a held direction can release its focus before the orientation event.
+    await packet("release");
+    await p.locator("#orientationNotice").waitFor();
+    assert.ok(await p.locator("#stop").isVisible());
+    assert.ok(await p.locator("#manual").isHidden());
+    assert.ok(await p.locator("#execute").isHidden());
+    assert.ok(await p.locator("[data-stage=distance]").isDisabled());
+    const offset = board.packets.length;
+    await p.setViewportSize({width:390,height:844});
+    await p.locator("#orientationNotice").waitFor({state:"hidden"});
+    await sleep(180);
+    assert.ok(!board.packets.slice(offset).some(m => ["drive","move_distance","cal_sample","claim","cal_begin"].includes(m.op)));
+  });
+}

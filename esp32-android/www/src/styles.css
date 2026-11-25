@@ -34,7 +34,7 @@ button, select, input[type=number] { min-height: 46px; border-radius: 10px; bord
 button { font-weight: 650; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 button:disabled { color: #abb0ac; cursor: default; background: #232728; }
 button:active:not(:disabled) { background: #414749; }
-button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 p, small { line-height: 1.48; text-wrap: pretty; }
 p { margin: 10px 0 14px; }
 small, .note, #overview>p, #wizard p { color: var(--muted); }
@@ -184,6 +184,7 @@ label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #precisionControls:has(#feedback:not(:empty)) #progress { display: none; }
 body[data-page="drive"] #actions .status-slot { height: auto; min-height: 24px; }
 #progress { text-align: center; }
+#moveGear { color: inherit; font-weight: 450; white-space: nowrap; }
 .goalChoices, .goalAmount { padding: var(--card-inset); border-radius: var(--card-radius); background: var(--surface); }
 .goalRow { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
 #actions button { min-height: 44px; padding: 4px; touch-action: manipulation; }
@@ -240,9 +241,20 @@ input[type=range] { flex: 1; min-width: 80px; accent-color: var(--amber); }
 #settings dd { margin: 0; }
 #settings { padding-top: var(--layout-gap); }
 .settings-tabs { margin-bottom: var(--layout-gap); }
-#wifiPanel { display: grid; gap: var(--layout-gap); }
+#wifiPanel, #chassisPanel, #overview { display: grid; gap: var(--layout-gap); }
 .settings-card { padding: 12px; background: var(--surface); border-radius: var(--card-radius); }
-.settings-card summary { cursor: pointer; padding-block: 5px; }
+.settings-card summary { cursor: pointer; padding-block: 12px; }
+details.settings-card { padding-block: 0; }
+details.settings-card[open] { padding-bottom: 12px; }
+.disclosure, .cal-heading { display: flex; align-items: center; gap: var(--layout-gap); }
+.disclosure { justify-content: space-between; text-align: start; }
+.disclosure::after { content: "›"; font-size: 22px; color: var(--amber); }
+body:not([data-page="cal"]) .cal-heading { display: none; }
+body[data-page="cal"] .toolbar { flex-wrap: wrap; gap: var(--layout-gap); }
+body[data-page="cal"] .cal-heading { flex: 1; }
+body[data-page="cal"] .toolbar .status-slot { order: 1; flex-basis: 100%; }
+body[data-page="cal"] .status-slot:has(#availability:empty):has(#feedback:empty) { display: none; }
+#overview .note { margin: 0; }
 .settings-heading, .gear-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .settings-heading h2 { margin: 0; }
 .settings-heading span, #gearStatus, #networkStatus { color: var(--muted); }
@@ -250,9 +262,8 @@ input[type=range] { flex: 1; min-width: 80px; accent-color: var(--amber); }
 .network-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 4px 8px; }
 .network-entry label { grid-column: 1 / -1; }
 .network-entry button { min-width: 60px; }
-#nearby { display: grid; max-height: 150px; overflow-y: auto; gap: 3px; }
-#nearby:empty, #networkMessage:empty { display: none; }
-#nearby button { text-align: left; overflow-wrap: anywhere; }
+#nearby { width: 100%; min-width: 0; text-overflow: ellipsis; }
+#networkMessage:empty { display: none; }
 #testWifi:not(:disabled) { background: var(--amber); color: var(--ground); }
 #forgetWifi { color: #ffb5a9; background: transparent; }
 #networkMessage, #gearStatus, #scanStatus { margin: 6px 0 0; }
@@ -261,7 +272,6 @@ input[type=range] { flex: 1; min-width: 80px; accent-color: var(--amber); }
 .gear-row button { padding: 0; }
 .gear-row input { text-align: center; appearance: textfield; }
 .gear-row input::-webkit-inner-spin-button { -webkit-appearance: none; }
-#nearby button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
 body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { display: none; }
 
 
@@ -273,6 +283,15 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
 #wizard .row button { flex:1 1 auto; }
 #mapping label { flex-wrap:nowrap; margin:0; }
 #mapping { gap:6px; margin-block:8px; }
-#sampleForm label { display:inline-flex; margin:6px 0; }
+#sampleForm label { display:flex; margin:6px 0; }
 #sampleForm input { width:5em; }
 #sampleForm button { margin-block:3px; }
+
+#orientationNotice { display: none; }
+@media (orientation: landscape) {
+  body[data-page="drive"] main { display: block; }
+  body[data-page="drive"] #drive { display: none; }
+  body:is([data-page="drive"], [data-page="cal"]) #orientationNotice {
+    display: block; align-self: start; margin-block: var(--layout-gap);
+  }
+}

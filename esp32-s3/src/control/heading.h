@@ -56,6 +56,8 @@ public:
 };
 
 struct PrecisionGoal {
+    static constexpr float moveAcceleration = 400.f; // mm/s² wheel reference ramp
+    int moveSpeed = 0;
     double origin = 0;
     float target = 0, yaw = 0, error = 0, tolerance = 0, bestError = 0;
     uint32_t progressAt = 0;
@@ -64,8 +66,9 @@ struct PrecisionGoal {
     bool approachingStop = false, observingRest = false, restInside = false;
     uint32_t restSince = 0;
 
-    void begin(float value, bool turning, const Heading &h, uint32_t now) {
+    void begin(float value, bool turning, const Heading &h, uint32_t now, int cruiseMmS = 0) {
         *this = {};
+        moveSpeed = turning ? 0 : cruiseMmS;
         origin = h.degrees;
         target = value;
         turn = turning;
@@ -93,11 +96,22 @@ struct PrecisionGoal {
             speed[1] = approachingStop ? 0 : std::lround(std::copysign(std::clamp(remaining * 1.8f, 9.f, limit), error));
             speed[0] = -speed[1];
         } else {
-            float base = std::copysign(std::clamp(remaining * 1.8f, 9.f, 60.f), error);
+            float limit = moveSpeed ? float(moveSpeed) : 60.f;
+            if (moveSpeed) {
+                // Reserve braking distance before the tolerance band, with margin for wheel lag.
+                float brakingSpeed = std::sqrt(2.f * (0.75f * moveAcceleration) * std::max(0.f, remaining - tolerance));
+                limit = std::min(limit, std::max(9.f, brakingSpeed));
+                approachingStop = previousError * error < 0;
+            }
+            float base = std::copysign(std::clamp(remaining * 1.8f, std::min(9.f, limit), limit), error);
             float bound = std::min(18.f, std::abs(base) * 0.5f);
             float trim = std::clamp(1.8f*yaw + 0.22f*h.rate, -bound, bound);
             speed[0] = std::lround(base + trim);
             speed[1] = std::lround(base - trim);
+            if (moveSpeed) {
+                for (int i = 0; i < 2; ++i)
+                    speed[i] = std::clamp(speed[i], -moveSpeed, moveSpeed);
+            }
         }
     }
     bool close() const { return std::abs(error) <= tolerance; }

@@ -19,9 +19,15 @@
     <div class="drive-summary">
     <p role="alert" id="batteryAlarm" hidden>Low battery. Stop and recharge.</p>
 
-    <div class="toolbar"><button id="stop" hidden disabled class="icon-button" aria-label="Stop" title="Stop"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none"/></svg></button></div>
+    <div class="toolbar">
+      <div class="cal-heading">
+        <button id="calBack" class="icon-button" aria-label="Back to chassis settings"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7M3 12h18"/></svg></button>
+        <h2>Chassis calibration</h2>
+      </div>
+      <button id="stop" hidden disabled class="icon-button" aria-label="Stop" title="Stop"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none"/></svg></button></div>
     </div>
 
+    <p id="orientationNotice" class="settings-card" role="status">Rotate to portrait to operate the rover.</p>
     <section id="drive" aria-label="Drive">
       <section id="vehicleTelemetry" aria-label="Vehicle telemetry">
         <div class="instrument-card">
@@ -56,7 +62,7 @@
       </div>
       <div id="manual">
         <div class="stick-board">
-          <div id="speedSetting" hidden role="group" aria-label="Joystick gears">
+          <div id="speedSetting" role="group" aria-label="Joystick gears">
             <button data-gear="0">G1<small>0.20 m/s</small></button>
             <button data-gear="1">G2<small>0.40 m/s</small></button>
             <button data-gear="2">G3<small>0.60 m/s</small></button>
@@ -74,7 +80,7 @@
           <div class="status-slot">
             <output id="availability">Connecting…</output><p id="feedback" role="status"></p>
           </div>
-          <div id="acceleration" hidden role="group" aria-label="Acceleration mode">
+          <div id="acceleration" role="group" aria-label="Acceleration mode">
             <button data-mode="smooth" aria-pressed="false">Comfort</button>
             <button data-mode="responsive" aria-pressed="true">Sport</button>
           </div>
@@ -84,9 +90,10 @@
     <div id="actions" hidden>
       <div id="precisionControls">
         <p id="progress" class="note" role="status"></p>
+        <button id="precisionCalibration" class="disclosure" hidden>Open chassis calibration</button>
         <div class="goalChoices">
           <div class="goalRow" aria-label="Movement type" role="group">
-            <button data-kind="distance">Move</button
+            <button data-kind="distance" aria-label="Move" aria-describedby="moveGear">Move <small id="moveGear" hidden></small></button
             ><button data-kind="angle">Turn</button>
           </div>
           <div class="goalRow" aria-label="Direction" role="group">
@@ -117,6 +124,7 @@
         <button data-panel="chassisPanel" aria-controls="chassisPanel" aria-pressed="false">Chassis</button>
       </div>
       <div id="chassisPanel" hidden>
+        <button id="openCalibration" class="settings-card disclosure" aria-controls="cal">Chassis calibration</button>
         <section class="settings-card" aria-labelledby="gearTitle">
           <div class="settings-heading"><h2 id="gearTitle">Gear speeds</h2><span>m/s</span></div>
           <div class="gear-row">
@@ -153,12 +161,13 @@
           <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
           <fieldset id="networkSetup" aria-label="Join a network" disabled>
             <div class="network-entry">
-              <label for="homeName">Network</label>
-              <input id="homeName" placeholder="Network name" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false">
+              <label for="nearby">Nearby networks</label>
+              <select id="nearby" disabled><option value="">Scan to find networks</option></select>
               <button id="scanWifi" aria-label="Scan networks">Scan</button>
             </div>
             <p id="scanStatus" role="status"></p>
-            <div id="nearby" role="group" aria-label="Nearby networks"></div>
+            <label for="homeName">Network name</label>
+            <input id="homeName" placeholder="Enter a network name" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false">
             <div class="network-entry">
               <label for="homePass">Password</label>
               <input type="password" id="homePass" maxlength="64" autocomplete="off">
@@ -190,7 +199,6 @@
       <p id="sectors"></p>
     </section>
     <section id="cal" hidden>
-      <h2>Chassis calibration</h2>
       <div id="trialResult" hidden>
         <p id="trialOutcome" role="status"></p>
         <button id="trialBack" class="icon-button" aria-label="Back to calibration" title="Back to calibration"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m10 5-7 7 7 7M3 12h18"/></svg></button>
@@ -199,8 +207,12 @@
         <div class="stages">
           <button data-stage="mapping">Wheel directions<span id="mappingState">Loading…</span></button>
           <button data-stage="distance">Distance<span id="distanceState">Loading…</span></button>
-          <button data-stage="turn">Turn angle<span id="turnState">Loading…</span></button>
+
         </div>
+        <details class="settings-card">
+          <summary>Advanced</summary>
+          <div class="stages"><button data-stage="turn">Effective track width<span id="turnState">Loading…</span></button></div>
+        </details>
         <p id="params" class="note"></p>
       </div>
       <fieldset id="wizard" hidden disabled>
@@ -240,9 +252,6 @@
   <nav aria-label="Console">
     <button data-page="drive" aria-current="page">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="m4 9 6 2m10-2-6 2m-2 3v7"/></svg>Drive
-    </button>
-    <button data-page="cal">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21Zm9-9 3 3m-7 1 2 2m-6 2 3 3"/></svg>Calibration
     </button>
     <button id="settingsButton" data-page="settings">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h5m4 0h9M3 12h11m4 0h3M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>Settings
