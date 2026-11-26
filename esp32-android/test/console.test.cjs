@@ -186,7 +186,8 @@ for (const [kind, op, key, value] of [
     await packet("claim", {precision:true});
     assert.equal(command.speed_mm_s, key === "distance_mm" ? 200 : undefined);
     assert.ok(command.request_key);
-    await p.getByText("Movement · running").waitFor();
+    const running = key === "angle_deg" ? `#${board.state.action_id} · running · Target ${value}°` : "Movement · running";
+    await p.locator("#progress").getByText(running, {exact:true}).waitFor();
     await packet("heartbeat",{lease:command.lease});
     assert.ok(await p.locator("#execute").isHidden());
     assert.ok(await p.locator("#actions #precisionStop").isVisible());

@@ -24,24 +24,22 @@ function firmware(executable) {
 
 function android() {
     const peer = new Controller();
-    let packets, starts = 0, elapsed = 0;
-    peer.socket = {send(raw) {
-        const packet = JSON.parse(raw);
-        if (packet.action_state === "running" && packet.event && packet.action_id !== lastAction) {
-            starts++;
-            lastAction = packet.action_id;
+    const queues = [[], []];
+    const started = new Set();
+    peer.sockets = queues.map(queue => ({
+        send(raw) {
+            const packet = JSON.parse(raw);
+            if (packet.event && packet.action_state === "running") started.add(packet.action_id);
+            queue.push(packet);
         }
-        packets.push(packet);
-    }};
-    let lastAction;
+    }));
     return {
-        exchange({frame, advance = 0}) {
-            packets = [];
-            if (frame) peer.receive(JSON.stringify(frame));
-            for (let i = 0; i < advance; i++) {
-                if (++elapsed % 100 === 0 && peer.state.owner === "self") peer.renew();
-            }
-            return {reply: packets.find(p => p.id !== undefined), events: packets.filter(p => p.event), starts};
+        exchange({frame, advance = 0, client = 0}) {
+            if (frame) peer.receive(JSON.stringify(frame), client);
+            peer.advance(advance);
+            const packets = queues[client].splice(0);
+            return {reply: packets.find(p => p.id !== undefined), events: packets.filter(p => p.event),
+                starts: started.size};
         },
         close() {}
     };
