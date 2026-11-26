@@ -8,14 +8,17 @@
 
 ## 本地验证
 
-从仓库根目录运行以下检查。宿主机需要 C++17 编译器、Node.js 及 Python 3.11 或以上版本。Python 测试使用摄像头替身，可在开发机或 CI 运行。
+从仓库根目录运行以下检查。宿主机需要 C++17 编译器、Node.js 22 及 Python 3.11 或以上版本。Python 测试使用摄像头替身，可在开发机或 CI 运行。
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install pyserial -r raspberry-pi/requirements.txt
+python -m pip install pyserial -r raspberry-pi/requirements.txt 'platformio>=6,<7'
+pio pkg install -d esp32-s3
 sh tools/check.sh
 ```
+
+宿主机检查会运行固件和 Android 替身的同一组协议样例。失败输出包含端、场景编号和断言名称。[协议检查与单端复跑](esp32-s3/test/protocol/README.md)
 
 Android 应用的手机触控、精确运动、标定和停车行为由浏览器验收测试覆盖。安装、运行与真机检查见[控制台验收](docs/controller-acceptance.md)。
 
