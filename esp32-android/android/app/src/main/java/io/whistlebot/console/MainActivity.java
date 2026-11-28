@@ -2,11 +2,18 @@ package io.whistlebot.console;
 
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Bundle;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private WifiManager.WifiLock controlWifiLock;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        registerPlugin(RoverDiscovery.class);
+        super.onCreate(state);
+    }
 
     @Override
     public void onResume() {

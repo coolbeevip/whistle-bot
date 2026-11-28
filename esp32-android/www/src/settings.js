@@ -50,11 +50,10 @@ async function refreshWifi() {
       net.home_ssid ? "Saved network: " + net.home_ssid : "No saved network") +
       (net.hotspot_on ? " · Hotspot: " + net.hotspot : "");
     $("networkAddress").hidden = !net.home_ip;
-    $("homeLink").href = net.home_ip ? "?board=" + encodeURIComponent(net.home_ip) : "";
     $("homeLink").textContent = net.home_ip;
     $("forgetWifi").hidden = !net.home_ssid;
     $("networkMessage").textContent = wifiError || (occupied ? "Finish driving or calibration first." : !setupAllowed ?
-      "To save a network, connect your phone to " + net.hotspot + " and set Controller address to 192.168.4.1." +
+      "To save a network, connect your phone to " + net.hotspot + " and identify it from Add rover." +
       (net.hotspot_on ? "" : " Hold BOOT for 5 seconds to enable the hotspot.") :
       (net.scan_state === "running" ? "" : net.message));
     const names = net.networks || [];

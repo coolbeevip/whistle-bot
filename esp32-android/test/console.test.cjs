@@ -39,39 +39,40 @@ async function open(t, configure = () => {}) {
     board.socket = socket;
     socket.onMessage(raw => board.receive(raw));
   });
-  await p.goto(consoleUrl + "?board=rover.test");
+  await p.goto(consoleUrl);
+  await p.evaluate(() => {
+    localStorage.setItem("esp32.deviceId", "Whistle-A00001");
+    localStorage.setItem("esp32.board", "rover.test");
+  });
+  await p.reload();
+  await p.getByRole("button", {name:"Whistle-A00001"}).tap();
   const packet = (op, fields = {}, from = 0) => until(() => board.packets.slice(from).find(m =>
     m.op === op && Object.entries(fields).every(([k,v]) => m[k] === v)), op + " " + JSON.stringify(fields));
   await packet("subscribe", {topic: "encoders"});
   return {p, board, packet};
 }
 
-test("Refreshing Drive keeps the toolbar stop hidden before the controller connects", async t => {
-  const {p} = await open(t);
-  let releaseScript;
-  const gate = new Promise(resolve => { releaseScript = resolve; });
-  await p.route("**/src/main.js", async route => {
-    await gate;
-    await route.continue();
+test("Cold start migrates once, retains offline rovers and stays silent until selection", async t => {
+  const {p,board} = await open(t);
+  const before = board.packets.length;
+  await p.evaluate(() => {
+    const rovers = JSON.parse(localStorage.getItem("esp32.rovers"));
+    rovers.push({deviceId:"Whistle-B00002"}, {deviceId:"Whistle-C00003"});
+    localStorage.setItem("esp32.rovers", JSON.stringify(rovers));
   });
-  await p.reload({waitUntil: "commit"});
-  const telemetry = p.locator("#vehicleTelemetry");
-  await telemetry.waitFor();
-  let top;
-  try {
-    assert.ok(await p.locator("#stop").isHidden());
-    assert.ok(await p.locator(".drive-summary").isHidden());
-    top = (await telemetry.boundingBox()).y;
-  } finally {
-    releaseScript();
-  }
-  await p.locator("body[data-connected=true]").waitFor();
-  assert.ok(await p.locator("#stop").isHidden());
-  assert.equal((await telemetry.boundingBox()).y, top);
-  await p.getByRole("button", {name:"Precision"}).tap();
-  assert.ok(await p.locator("#stop").isHidden());
-  assert.ok(await p.locator("#execute").isVisible());
-  assert.ok(await p.locator("#precisionStop").isHidden());
+  await p.reload();
+  const cards = p.locator("#roverCards button");
+  assert.equal(await cards.count(), 3);
+  const [a,b,c] = await Promise.all([0,1,2].map(i => cards.nth(i).boundingBox()));
+  assert.equal(a.y,b.y);
+  assert.ok(c.y > a.y && Math.abs(a.width-a.height) <= 1);
+  assert.ok(await p.locator("main").isHidden());
+  assert.equal(board.packets.length,before);
+  await p.evaluate(() => {localStorage.removeItem("esp32.rovers"); localStorage.removeItem("esp32.deviceId");});
+  await p.reload();
+  assert.equal(await cards.count(),0);
+  assert.ok(await p.locator("#addRover").isVisible());
+  assert.equal(board.packets.length,before);
 });
 
 const directions = {Forward: [1,1,0.5,0.14], Reverse: [-1,-1,0.5,0.86],
@@ -261,16 +262,6 @@ for (const turn of [false,true]) {
   });
 }
 
-test("Joystick gear selection remains available when the board disconnects", async t => {
-  const {p, board} = await open(t);
-  board.socket.close();
-  await p.locator("#connection").getByText("Disconnected").waitFor();
-  assert.equal(await p.locator("[data-gear]:visible").count(), 4);
-  await p.locator('[data-gear="2"]').tap();
-  assert.equal(await p.locator('[data-gear="2"]').getAttribute("aria-pressed"), "true");
-  assert.ok(await p.locator(".up").isDisabled());
-});
-
 test("Locks, disconnect and reconnect", async t => {
   const {p,board} = await open(t,b => { b.state.owner = "usb"; });
   assert.ok(await p.locator(".up").isDisabled());
@@ -281,7 +272,7 @@ test("Locks, disconnect and reconnect", async t => {
   await p.getByRole("button",{name:"Precision"}).tap();
   assert.ok(await p.locator("#execute").isDisabled());
   board.socket.close();
-  await p.locator("#connection").getByText("Disconnected").waitFor();
+  await p.locator("#retryRover").tap();
   await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
   assert.equal(board.packets.some(m => ["claim","drive","drive_low"].includes(m.op)),false);
 });
@@ -383,40 +374,42 @@ test("Holding Forward suppresses the context menu and still releases control", a
     assert.ok(await menuCancelled(selector));
 });
 
-test("A failed handshake reconnects and tolerates a slow status reply", async t => {
-  const {p,board} = await open(t, b => {
-    const receive = b.receive.bind(b);
-    let first = true;
-    b.receive = raw => {
-      const m = JSON.parse(raw);
-      if (first && m.op === "hello") {
-        first = false;
-        return b.send({id:m.id,ok:false,error:"BUSY"});
-      }
-      if (m.op === "status") return setTimeout(() => receive(raw), 900);
-      receive(raw);
-    };
+test("An address reused by B never opens B and targeted discovery can recover A", async t => {
+  const {p,board} = await open(t);
+  await p.reload();
+  board.deviceId = "Whistle-B00002";
+  const start = board.packets.length;
+  await p.getByRole("button",{name:"Whistle-A00001"}).tap();
+  await p.locator("#retryRover").waitFor();
+  assert.deepEqual(board.packets.slice(start).map(m => m.op), ["hello"]);
+  assert.ok(await p.locator("main").isHidden());
+  const moved = new Controller();
+  await p.routeWebSocket("ws://second.test/ws", socket => {
+    moved.socket = socket;
+    socket.onMessage(raw => moved.receive(raw));
   });
-  await p.locator("#connection").getByText("Connected",{exact:true}).waitFor();
-  assert.ok(await p.locator(".up").isEnabled());
-  assert.equal(board.packets.some(m => m.op === "claim"), false);
+  await p.evaluate(() => {
+    window.Capacitor = {Plugins:{RoverDiscovery:{find:async ({deviceId}) => ({deviceId,host:"second.test"})}}};
+  });
+  await p.locator("#retryRover").tap();
+  await p.locator("#vehicleTelemetry").waitFor();
+  assert.ok(moved.packets.some(m => m.op === "subscribe"));
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem("esp32.rovers"))[0].host),"second.test");
 });
 
-test("Changing controller address reconnects from the local page and remembers the selection", async t => {
-  const {p} = await open(t);
-  const other = new Controller();
-  await p.routeWebSocket("ws://second.test/ws", socket => {
-    other.socket = socket;
-    socket.onMessage(raw => other.receive(raw));
+test("Cancelling a pending handshake leaves the garage in control", async t => {
+  const {p,board} = await open(t);
+  await p.reload();
+  await p.routeWebSocket("ws://rover.test/ws", socket => {
+    socket.onMessage(raw => board.packets.push(JSON.parse(raw)));
   });
-  await p.locator("#settingsButton").tap();
-  await p.locator("#controllerPanel summary").tap();
-  await p.locator("#boardHost").fill("second.test");
-  await p.getByRole("button",{name:"Connect",exact:true}).tap();
-  await until(() => other.packets.some(m => m.op === "subscribe"), "second board handshake");
-  await p.goto(consoleUrl);
-  await until(() => other.packets.filter(m => m.op === "hello").length === 2, "remembered board handshake");
-  assert.equal(await p.locator("#boardHost").inputValue(), "second.test");
+  const start = board.packets.length;
+  await p.getByRole("button",{name:"Whistle-A00001"}).tap();
+  await until(() => board.packets.length > start, "pending hello");
+  await p.locator("#cancelSelection").tap();
+  assert.ok(await p.locator("main").isHidden());
+  assert.ok(await p.locator("#retryRover").isHidden());
+  assert.deepEqual(board.packets.slice(start).map(m => m.op), ["hello"]);
 });
 
 test("IMU telemetry shows signed values on each axis and clears stale samples", async t => {
@@ -526,8 +519,6 @@ test("Narrow layout keeps related drive controls on one line", async t => {
   await p.getByRole("button",{name:"Settings"}).tap();
   await sameRow(["#nearby","#scanWifi"]);
   await sameRow(["#homePass","#showPass"]);
-  await p.locator("#controllerPanel summary").tap();
-  await sameRow(["#boardHost","#boardForm button"]);
 });
 
 test("Telemetry values stay on one line without shifting the drive controls", async t => {
@@ -624,6 +615,7 @@ test("A silent open socket expires and telemetry resumes without replaying movem
   await p.getByText("Telemetry delayed", {exact:true}).waitFor();
   assert.ok(await p.locator(".up").isDisabled());
   assert.equal(await p.textContent("#m3"), "—");
+  await p.locator("#retryRover").tap();
   await packet("subscribe", {topic:"encoders"}, start);
   await until(async () => await p.locator(".up").isEnabled(), "fresh feedback after reconnect");
   assert.ok(board.packets.slice(start).every(m => ["hello","status","subscribe"].includes(m.op)));

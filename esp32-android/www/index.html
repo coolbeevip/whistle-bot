@@ -9,12 +9,26 @@
   <meta name="theme-color" content="#141718" /><title>Whistle Bot</title>
   <link rel="stylesheet" href="/src/styles.css">
 </head>
-<body data-page="drive">
+<body data-page="drive" data-selecting="true">
   <header>
     <h1><span class="mark" aria-hidden="true"></span>Whistle Bot</h1>
     <output class="sr-only" id="connection">Connecting…</output>
     <div class="rover-power"><span class="sr-only">Rover battery </span><strong id="battery">—</strong></div>
   </header>
+  <section id="garage" aria-labelledby="garageTitle">
+    <h2 id="garageTitle">Your rovers</h2>
+    <div id="roverCards"></div>
+    <p id="selectionStatus" role="status"></p>
+    <button id="retryRover" hidden>Retry</button>
+    <button id="cancelSelection" hidden>Cancel</button>
+    <button id="addRover">Add rover</button>
+    <section id="networkWizard" hidden>
+      <h2>Connect a rover</h2>
+      <p>Connect your phone to the rover’s Whistle hotspot, then identify it.</p>
+      <button id="useHotspot">Identify rover</button>
+      <button id="closeWizard">Back to rovers</button>
+    </section>
+  </section>
   <main>
     <div class="drive-summary">
     <p role="alert" id="batteryAlarm" hidden>Low battery. Stop and recharge.</p>
@@ -158,7 +172,7 @@
         <section class="settings-card" aria-labelledby="wifiTitle">
           <div class="settings-heading"><h2 id="wifiTitle">Home Wi-Fi</h2><span>2.4 GHz</span></div>
           <p id="networkStatus" role="status">Connecting…</p>
-          <p id="networkAddress" hidden>Home address · <a id="homeLink"></a></p>
+          <p id="networkAddress" hidden>Home address · <span id="homeLink"></span></p>
           <fieldset id="networkSetup" aria-label="Join a network" disabled>
             <div class="network-entry">
               <label for="nearby">Nearby networks</label>
@@ -178,13 +192,7 @@
           </fieldset>
           <p id="networkMessage" role="status"></p>
         </section>
-        <details class="settings-card" id="controllerPanel">
-          <summary>Controller address</summary>
-          <form id="boardForm" class="row">
-            <input id="boardHost" aria-label="Controller address" required autocapitalize="none" spellcheck="false">
-            <button type="submit">Connect</button>
-          </form>
-        </details>
+
       <details class="settings-card" id="recoveryPanel">
         <summary>Hotspot recovery</summary>
         <dl><dt>Blue</dt><dd>Hotspot ready</dd><dt>Amber pulse</dt><dd>Scanning or connecting</dd>
@@ -260,6 +268,7 @@
   </footer>
   <script defer src="/src/console.js"></script>
   <script defer src="/src/connection.js"></script>
+  <script defer src="/src/garage.js"></script>
   <script defer src="/src/drive.js"></script>
   <script defer src="/src/settings.js"></script>
   <script defer src="/src/calibration.js"></script>

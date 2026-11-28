@@ -278,7 +278,6 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
 .icon { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .icon-button { display:inline-grid; place-items:center; width:44px; min-height:44px; padding:0; vertical-align:middle; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-#boardForm { grid-template-columns:minmax(0,1fr) auto; align-items:center; margin-bottom:8px; gap:6px; }
 #wizard .row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 #wizard .row button { flex:1 1 auto; }
 #mapping label { flex-wrap:nowrap; margin:0; }
@@ -295,3 +294,9 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
     display: block; align-self: start; margin-block: var(--layout-gap);
   }
 }
+
+#garage { width:min(100%,32rem); margin:0 auto; padding:1rem; overflow:auto; }
+#garage[hidden], body[data-selecting=true] :is(main,footer,.rover-power) { display:none; }
+#roverCards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; margin-bottom:1rem; }
+#roverCards button { aspect-ratio:1; width:100%; height:auto; overflow-wrap:anywhere; }
+#selectionStatus:empty { display:none; }

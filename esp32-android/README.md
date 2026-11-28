@@ -17,6 +17,6 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 ## 连接小车
 
-手机连接小车热点后打开 **Whistle Bot**，默认地址为 `192.168.4.1`。使用家庭热点或局域网时，将手机和小车接入同一网络，在 **Settings → Controller address** 输入小车的局域网 IP。应用会记住所选地址，显示 **Connected** 后即可查看遥测。
+打开 **Whistle Bot** 会先看到已添加的小车。首次使用时，连接小车热点并在 **Add rover** 中识别车辆。点选卡片后 App 核对车辆身份，旧地址失效时通过 mDNS 查找同一辆车。
 
 首次配置与热点恢复见[控制器指南](../docs/controller.md)。触控回归测试与真机检查见[验收说明](../docs/controller-acceptance.md)。

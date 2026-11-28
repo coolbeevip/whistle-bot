@@ -62,4 +62,4 @@ setInterval(async () => {
   }
 }, 100);
 showGears();
-connect();
+showGarage();

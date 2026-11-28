@@ -6,20 +6,6 @@ function validBoard(value) {
   if (!value || !/^[a-z0-9.-]+(:[0-9]{1,5})?$/i.test(value)) return false;
   try { return Boolean(new URL("ws://" + value).hostname); } catch { return false; }
 }
-const requestedBoard = new URLSearchParams(location.search).get("board");
-const rememberedBoard = localStorage.getItem("esp32.board");
-const boardHost = [requestedBoard, rememberedBoard, hotspotAddress].find(validBoard);
-if (validBoard(requestedBoard)) localStorage.setItem("esp32.board", boardHost);
-$("boardHost").value = boardHost;
-$("boardForm").onsubmit = e => {
-  e.preventDefault();
-  const input = $("boardHost");
-  const host = input.value.trim();
-  input.setCustomValidity(validBoard(host) ? "" : "Enter the controller IP address or hostname.");
-  if (input.reportValidity()) location.assign("?board=" + encodeURIComponent(host));
-};
-$("boardHost").oninput = () => $("boardHost").setCustomValidity("");
-
 function call(op, fields = {}, timeout = op.startsWith("wifi_") ? 3000 : 700) {
   if (!ws || ws.readyState !== 1 || (!session && op !== "hello"))
     return Promise.reject(Error("Disconnected"));
@@ -43,30 +29,42 @@ function call(op, fields = {}, timeout = op.startsWith("wifi_") ? 3000 : 700) {
   });
 }
 let reconnectSilentSocket;
-function connect() {
-  ws = new WebSocket("ws://" + boardHost + "/ws");
+function connect(host, expectedId) {
+  let accepted = false;
+  let resolve, reject;
+  const result = new Promise((ok, fail) => { resolve = ok; reject = fail; });
+  ws = new WebSocket("ws://" + host + "/ws");
   const socket = ws;
   const opening = setTimeout(() => disconnectCurrent(), 5000);
   ws.onopen = async () => {
     clearTimeout(opening);
     try {
       const h = await call("hello", {}, 3000);
+      if (ws !== socket) return;
+      if (!validDevice(h.device_id) || (expectedId && expectedId !== h.device_id)) throw Error("Different rover");
       session = h.session;
       speedLimits = h;
       rateStamp = smoothedSpeed = undefined;
-      last = await call("status", {}, 3000);
+      const status = await call("status", {}, 3000);
+      if (ws !== socket) return;
+      last = status;
       lastSample = Date.now();
       await call("subscribe", { topic: "encoders", hz: 5 }, 3000);
+      if (ws !== socket) return;
       $("lidar").hidden = !h.capabilities.includes("lidar_sectors");
       if (!$("lidar").hidden)
         await call("subscribe", { topic: "lidar_sectors", hz: 5 }, 3000);
+      if (ws !== socket) return;
+      accepted = true;
+      resolve({deviceId:h.device_id, host});
       $("connection").textContent = "Connected";
       render();
-    } catch {
-      disconnectCurrent();
+    } catch (error) {
+      disconnectCurrent(error);
     }
   };
   ws.onmessage = (e) => {
+    if (ws !== socket) return;
     let m;
     try {
       m = JSON.parse(e.data);
@@ -120,7 +118,7 @@ function connect() {
     else p.reject(Object.assign(Error(m.error || "Request failed"), {owner:m.owner, window:m.window, lease:m.lease}));
   };
   ws.onclose = () => disconnectCurrent();
-  function disconnectCurrent() {
+  function disconnectCurrent(error) {
     if (ws !== socket) return;
     clearTimeout(opening);
     socket.onclose = socket.onopen = socket.onmessage = null;
@@ -141,9 +139,11 @@ function connect() {
     $("sectors").textContent = "Data stale";
     render();
     $("connection").textContent = "Disconnected";
-    setTimeout(connect, 1200);
+    reject(error || Error("Rover unavailable"));
+    if (accepted) connectionEnded();
   }
   reconnectSilentSocket = disconnectCurrent;
+  return result;
 }
 async function acquire(kind, token) {
   const r = await call(kind === "cal" ? "cal_begin" : "claim", kind === "manual" ? {manual_pad:true} : kind === "action" ? {precision:true} : {});

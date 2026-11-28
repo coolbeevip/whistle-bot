@@ -239,6 +239,7 @@ String handleFrame(Session &s, const String &wire, uint32_t receivedAt, bool usb
         auto state = snapshot();
         r["session"] = s.sid;
         r["boot_id"] = state.boot;
+        r["device_id"] = controllerName();
         r["basic_ticks_min"] = board::minBasicTicks;
         r["basic_ticks_max"] = board::maxBasicTicks;
         r["basic_ticks_default"] = board::defaultBasicTicks;

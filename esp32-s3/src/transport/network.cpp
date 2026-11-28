@@ -2,6 +2,7 @@
 #include "network.h"
 #include "../runtime/controller.h"
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <Preferences.h>
 #include <esp_wifi.h>
 
@@ -186,6 +187,8 @@ void networkTask(void *) {
 }
 } // namespace
 
+const char *controllerName() { return apName; }
+
 void startNetwork(const char *name, const char *pass, void (*stopMotion)()) {
     apName = name;
     apPassword = pass;
@@ -204,6 +207,10 @@ void startNetwork(const char *name, const char *pass, void (*stopMotion)()) {
     WiFi.setSleep(false);  // Keep the station awake for short control-window heartbeats.
     WiFi.setAutoReconnect(false);
     startAp();
+    if (MDNS.begin(apName)) {
+        MDNS.setInstanceName(apName);
+        MDNS.addService("whistlebot", "tcp", 80);
+    }
     if (saved.ssid[0]) join(saved, false);
     if (xTaskCreate(networkTask, "rover-network", 6144, nullptr, 1, nullptr) != pdPASS) abort();
 }
