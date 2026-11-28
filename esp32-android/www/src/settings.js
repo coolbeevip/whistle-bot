@@ -36,10 +36,12 @@ function presentNetworks(names, scanning) {
   highlightNetwork();
 }
 async function refreshWifi() {
-  if (wifiPoll || wifiRequest || page !== "settings" || $("wifiPanel").hidden || !session) return;
+  if (wifiPoll || wifiRequest || (wizardStep !== "configure" && (page !== "settings" || $("wifiPanel").hidden)) || !session) return;
   wifiPoll = true;
   try {
+    const socket = ws;
     const net = await call("wifi_status");
+    if (socket !== ws) return;
     if (wifiRequest) return;
     const occupied = last.owner !== "free";
     setupAllowed = net.setup_allowed;
@@ -56,6 +58,7 @@ async function refreshWifi() {
       "To save a network, connect your phone to " + net.hotspot + " and identify it from Add rover." +
       (net.hotspot_on ? "" : " Hold BOOT for 5 seconds to enable the hotspot.") :
       (net.scan_state === "running" ? "" : net.message));
+    if (wizardStep === "configure") offerSwitch(net);
     const names = net.networks || [];
     presentNetworks(names, net.scan_state === "running");
     $("scanWifi").textContent = net.scan_state === "running" ? "Scanning…" : "Scan";
@@ -78,9 +81,11 @@ async function changeWifi(op,fields={}) {
     $("scanStatus").textContent = "";
   }
   try {
+    if (op === "wifi_test" && wizardStep === "configure") savedNetwork = fields.ssid;
     await call(op,fields);
     if (op === "wifi_test") $("homePass").value = "";
   } catch (e) {
+    if (op === "wifi_test") savedNetwork = null;
     wifiError = e.message === "BUSY" ? "The rover is busy. Try again shortly." : "Request failed: " + e.message;
     $("networkMessage").textContent = wifiError;
   } finally { wifiRequest = false; await refreshWifi(); }

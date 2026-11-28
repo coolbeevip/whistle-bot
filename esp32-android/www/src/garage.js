@@ -20,7 +20,10 @@ function remember(rover) {
 function showGarage(message = "") {
   document.body.dataset.selecting = "true";
   $("garage").hidden = false;
+  resetWizard();
   $("networkWizard").hidden = true;
+  $("roverCards").hidden = $("addRover").hidden = false;
+  $("garageTitle").textContent = "Your rovers";
   $("roverCards").replaceChildren();
   for (const rover of rovers) {
     const button = document.createElement("button");
@@ -33,6 +36,7 @@ function showGarage(message = "") {
   $("cancelSelection").hidden = true;
 }
 function connectionEnded() {
+  if (wizardDisconnected()) return;
   if (selectedRover) retrySelection = () => selectRover(selectedRover);
   showGarage("Disconnected. Select a rover to reconnect.");
 }
@@ -42,7 +46,7 @@ function cancelSelection() {
   retrySelection = null;
   showGarage();
 }
-async function selectRover(rover) {
+async function selectRover(rover, onMatch = enterRover) {
   const token = ++selecting;
   if (ws) reconnectSilentSocket();
   $("selectionStatus").textContent = "Connecting…";
@@ -62,22 +66,27 @@ async function selectRover(rover) {
       match = await connect(found.host, rover.deviceId);
     }
     if (token !== selecting) return;
-    selectedRover = match;
-    remember(match);
-    retrySelection = null;
-    $("garage").hidden = true;
-    document.body.dataset.selecting = "false";
-    showPage("drive");
+    await onMatch(match, token);
   } catch (error) {
     if (token !== selecting) return;
+    if (ws) reconnectSilentSocket();
+    if (!$("networkWizard").hidden) {
+      $("selectionStatus").textContent = error.message + ". Try again or return to rovers.";
+      $("cancelSelection").hidden = true;
+      return;
+    }
     retrySelection = () => selectRover(rover);
     showGarage(error.message + ". Retry or open the network wizard.");
   }
 }
 $("retryRover").onclick = () => retrySelection?.();
 $("cancelSelection").onclick = $("closeWizard").onclick = cancelSelection;
-$("addRover").onclick = () => {
-  cancelSelection();
-  $("networkWizard").hidden = false;
-};
-$("useHotspot").onclick = () => selectRover({host:hotspotAddress});
+function enterRover(match) {
+  selectedRover = match;
+  remember(match);
+  resetWizard();
+  retrySelection = null;
+  $("garage").hidden = true;
+  document.body.dataset.selecting = "false";
+  showPage("drive");
+}

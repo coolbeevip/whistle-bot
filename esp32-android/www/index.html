@@ -23,9 +23,39 @@
     <button id="cancelSelection" hidden>Cancel</button>
     <button id="addRover">Add rover</button>
     <section id="networkWizard" hidden>
-      <h2>Connect a rover</h2>
-      <p>Connect your phone to the rover’s Whistle hotspot, then identify it.</p>
-      <button id="useHotspot">Identify rover</button>
+      <div data-step="choose">
+        <button id="hotspotPath">Connect to rover hotspot</button>
+        <button id="lanPath">Search on home Wi-Fi</button>
+      </div>
+      <div data-step="hotspot" hidden>
+        <h2>Join the rover hotspot</h2>
+        <p>Power on the rover and wait for startup. In phone Wi-Fi settings, join its Whistle network using its hotspot password.</p>
+        <p>If the hotspot is missing, hold BOOT for at least 5 seconds. Keep holding while the light flashes purple. Release when it turns solid blue.</p>
+        <p>Holding BOOT again keeps hotspot mode. Restart normally to reconnect to a saved home network.</p>
+        <button id="useHotspot">Identify rover</button>
+      </div>
+      <div data-step="lan" hidden>
+        <h2>Search on home Wi-Fi</h2>
+        <p>A solid green light indicates the rover is on home Wi-Fi. Join the same network on your phone.</p>
+        <button id="searchLan">Search rovers</button>
+        <div id="foundRovers"></div>
+        <button id="useHotspotInstead">Use hotspot instead</button>
+      </div>
+      <div data-step="identified" hidden>
+        <h2 id="identifiedRover"></h2>
+        <button id="addAndDrive">Add and drive</button>
+        <button id="configureHome">Set up home Wi-Fi</button>
+      </div>
+      <div data-step="configure" hidden>
+        <p>Choose a 2.4 GHz network. An amber pulse means scanning or connecting. A short red flash indicates an error. Solid green means connected.</p>
+        <div id="wizardWifi"></div>
+      </div>
+      <div data-step="switch" hidden>
+        <h2>Join home Wi-Fi</h2>
+        <p id="switchHint"></p>
+        <button id="verifyHome">Find this rover</button>
+        <button id="switchHotspot">Return to hotspot setup</button>
+      </div>
       <button id="closeWizard">Back to rovers</button>
     </section>
   </section>
@@ -272,6 +302,7 @@
   <script defer src="/src/drive.js"></script>
   <script defer src="/src/settings.js"></script>
   <script defer src="/src/calibration.js"></script>
+  <script defer src="/src/wizard.js"></script>
   <script defer src="/src/main.js"></script>
 
 </body>

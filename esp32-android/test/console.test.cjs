@@ -412,6 +412,68 @@ test("Cancelling a pending handshake leaves the garage in control", async t => {
   assert.deepEqual(board.packets.slice(start).map(m => m.op), ["hello"]);
 });
 
+test("The hotspot wizard identifies before adding and deduplicates after a Wi-Fi change", async t => {
+  const {p,board} = await open(t);
+  await p.evaluate(() => { localStorage.clear(); });
+  await p.reload();
+  for (const host of ["192.168.4.1","192.168.1.80"]) {
+    await p.routeWebSocket("ws://" + host + "/ws", socket => {
+      board.socket = socket;
+      board.net.setup_allowed = host === "192.168.4.1";
+      socket.onMessage(raw => board.receive(raw));
+    });
+  }
+  const identify = async () => {
+    await p.locator("#addRover").tap();
+    await p.locator("#hotspotPath").tap();
+    await p.locator("#useHotspot").tap();
+    await p.locator("#identifiedRover").getByText("Whistle-A00001").waitFor();
+  };
+  await identify();
+  assert.ok(await p.locator("main").isHidden());
+  assert.equal(await p.evaluate(() => localStorage.getItem("esp32.rovers")),null);
+  await p.locator("#addAndDrive").tap();
+  await p.locator("#vehicleTelemetry").waitFor();
+  await p.reload();
+  await identify();
+  await p.locator("#configureHome").tap();
+  await p.locator("#homeName").fill("Test AP");
+  await p.locator("#testWifi").tap();
+  await until(() => board.net.home_ssid === "Test AP","network requested");
+  assert.ok(await p.locator("#verifyHome").isHidden());
+  Object.assign(board.net,{home_ip:"192.168.1.80",message:"Connected and saved."});
+  board.event();
+  await p.locator("#verifyHome").tap();
+  await p.locator("#vehicleTelemetry").waitFor();
+  assert.deepEqual(await p.evaluate(() => JSON.parse(localStorage.getItem("esp32.rovers"))),
+    [{deviceId:"Whistle-A00001",host:"192.168.1.80"}]);
+});
+
+test("LAN wizard waits for selection with zero, one and multiple results and ignores cancelled searches", async t => {
+  const {p,board} = await open(t);
+  await p.reload();
+  await p.evaluate(() => {
+    const searches = [[],["Whistle-A00001"],["Whistle-A00001","Whistle-B00002"]];
+    window.Capacitor = {Plugins:{RoverDiscovery:{find:async () => {
+      if (searches.length) return {devices:searches.shift()};
+      return new Promise(resolve => {window.finishDiscovery = () => resolve({devices:["Whistle-C00003"]});});
+    }}}};
+  });
+  const start = board.packets.length;
+  await p.locator("#addRover").tap();
+  await p.locator("#lanPath").tap();
+  for (const count of [0,1,2]) {
+    await p.locator("#searchLan").tap();
+    assert.equal(await p.locator("#foundRovers button").count(),count);
+  }
+  await p.locator("#searchLan").tap();
+  await p.locator("#closeWizard").tap();
+  await p.evaluate(() => window.finishDiscovery());
+  assert.ok(await p.locator("#networkWizard").isHidden());
+  assert.equal(await p.locator("#foundRovers button").count(),0);
+  assert.equal(board.packets.length,start);
+});
+
 test("IMU telemetry shows signed values on each axis and clears stale samples", async t => {
   const {p,board} = await open(t);
   await p.locator("#imuReadings").waitFor();

@@ -300,3 +300,9 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
 #roverCards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; margin-bottom:1rem; }
 #roverCards button { aspect-ratio:1; width:100%; height:auto; overflow-wrap:anywhere; }
 #selectionStatus:empty { display:none; }
+
+#networkWizard [data-step], #foundRovers { display:grid; gap:var(--layout-gap); }
+#networkWizard { display:grid; gap:1rem; }
+#networkWizard p { margin:.25rem 0; }
+#networkWizard #closeWizard { justify-self:start; }
+#garage { padding-bottom:calc(1rem + env(safe-area-inset-bottom)); }
