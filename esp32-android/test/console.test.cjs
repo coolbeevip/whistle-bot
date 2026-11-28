@@ -49,6 +49,7 @@ async function open(t, configure = () => {}) {
   const packet = (op, fields = {}, from = 0) => until(() => board.packets.slice(from).find(m =>
     m.op === op && Object.entries(fields).every(([k,v]) => m[k] === v)), op + " " + JSON.stringify(fields));
   await packet("subscribe", {topic: "encoders"});
+  await packet("wifi_status");
   return {p, board, packet};
 }
 
@@ -415,7 +416,7 @@ test("Cancelling a pending handshake leaves the garage in control", async t => {
   assert.deepEqual(board.packets.slice(start).map(m => m.op), ["hello"]);
 });
 
-test("The hotspot wizard identifies before adding and deduplicates after a Wi-Fi change", async t => {
+test("The hotspot wizard identifies before adding and keeps both routes after a Wi-Fi change", async t => {
   const {p,board} = await open(t);
   await p.evaluate(() => { localStorage.clear(); });
   await p.reload();
@@ -449,7 +450,19 @@ test("The hotspot wizard identifies before adding and deduplicates after a Wi-Fi
   await p.locator("#verifyHome").tap();
   await p.locator("#vehicleTelemetry").waitFor();
   assert.deepEqual(await p.evaluate(() => JSON.parse(localStorage.getItem("esp32.rovers"))),
-    [{deviceId:"Whistle-A00001",host:"192.168.1.80"}]);
+    [{deviceId:"Whistle-A00001",host:"192.168.4.1",source:"hotspot",ssid:"Whistle-A00001"},
+     {deviceId:"Whistle-A00001",host:"192.168.1.80",source:"wifi",ssid:"Test AP"}]);
+  await p.reload();
+  const cards = p.locator("#roverCards button");
+  assert.equal(await cards.count(), 2);
+  assert.deepEqual(await cards.locator(".rover-network span").allTextContents(), ["Whistle-A00001","Test AP"]);
+  for (const source of ["hotspot","wifi"]) {
+    await cards.filter({has:p.locator('[data-source="' + source + '"]')}).tap();
+    await p.locator("#vehicleTelemetry").waitFor();
+    assert.equal(board.net.setup_allowed, source === "hotspot");
+    await p.reload();
+    assert.equal(await cards.count(), 2);
+  }
 });
 
 test("LAN wizard waits for selection with zero, one and multiple results and ignores cancelled searches", async t => {
@@ -746,16 +759,45 @@ test("Precision renews fresh windows during a delayed heartbeat and shows one ti
   assert.ok(await p.locator(".drive-summary").isHidden());
 });
 
+test("A slow encoder subscription can finish the home Wi-Fi handshake", async t => {
+  const {p, board} = await open(t, board => {
+    const receive = board.receive.bind(board);
+    board.receive = raw => {
+      const packet = JSON.parse(raw);
+      if (packet.op === "subscribe" && packet.topic === "encoders") {
+        setTimeout(() => {
+          receive(raw);
+          board.event();
+        }, 3200);
+      } else receive(raw);
+    };
+  });
+  await until(async () => await p.locator(".up").isEnabled(), "delayed subscription accepted");
+  assert.equal(board.packets.filter(m => m.op === "hello").length, 1);
+});
+
+test("Home Wi-Fi recovers an idle telemetry gap on the same session", async t => {
+  const {p, board} = await open(t);
+  const start = board.packets.length;
+  await p.locator("#driveToast").getByText("Telemetry delayed", {exact:true}).waitFor();
+  assert.ok(await p.locator(".up").isDisabled());
+  await sleep(1600);
+  board.event({m3_ticks:456});
+  await until(async () => await p.locator(".up").isEnabled(), "fresh telemetry restored");
+  assert.equal(await p.textContent("#m3"), "456");
+  assert.equal(board.packets.length, start);
+});
+
 test("A silent open socket expires and telemetry resumes without replaying movement", async t => {
   const {p, board, packet} = await open(t);
   const start = board.packets.length;
   await p.locator("#driveToast").getByText("Telemetry delayed", {exact:true}).waitFor();
   assert.ok(await p.locator(".up").isDisabled());
   assert.equal(await p.textContent("#m3"), "—");
-  await p.locator("#retryRover").tap();
+  await p.locator("#retryRover").tap({timeout:8000});
   await packet("subscribe", {topic:"encoders"}, start);
   await until(async () => await p.locator(".up").isEnabled(), "fresh feedback after reconnect");
-  assert.ok(board.packets.slice(start).every(m => ["hello","status","subscribe"].includes(m.op)));
+  assert.ok(board.packets.slice(start).every(m => ["hello","status","subscribe","wifi_status"].includes(m.op)));
 });
 
 test("Precision links to calibration when distance verification is missing", async t => {

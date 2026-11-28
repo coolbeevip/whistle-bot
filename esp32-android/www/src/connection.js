@@ -29,32 +29,38 @@ function call(op, fields = {}, timeout = op.startsWith("wifi_") ? 3000 : 700) {
   });
 }
 let reconnectSilentSocket;
+let idleTelemetryTimeout = 2200, subscriptionsReady = false;
 function connect(host, expectedId) {
+  const homeNetwork = host !== hotspotAddress;
+  const handshakeTimeout = homeNetwork ? 6000 : 3000;
+  subscriptionsReady = false;
   let accepted = false;
   let resolve, reject;
   const result = new Promise((ok, fail) => { resolve = ok; reject = fail; });
   ws = new WebSocket("ws://" + host + "/ws");
   const socket = ws;
-  const opening = setTimeout(() => disconnectCurrent(), 5000);
+  const opening = setTimeout(() => disconnectCurrent(), homeNetwork ? 8000 : 5000);
   ws.onopen = async () => {
     clearTimeout(opening);
     try {
-      const h = await call("hello", {}, 3000);
+      const h = await call("hello", {}, handshakeTimeout);
       if (ws !== socket) return;
       if (!validDevice(h.device_id) || (expectedId && expectedId !== h.device_id)) throw Error("Different rover");
       session = h.session;
       speedLimits = h;
       rateStamp = smoothedSpeed = undefined;
-      const status = await call("status", {}, 3000);
+      const status = await call("status", {}, handshakeTimeout);
       if (ws !== socket) return;
       last = status;
       lastSample = Date.now();
-      await call("subscribe", { topic: "encoders", hz: 5 }, 3000);
+      await call("subscribe", { topic: "encoders", hz: homeNetwork ? 3 : 5 }, handshakeTimeout);
       if (ws !== socket) return;
       $("lidar").hidden = !h.capabilities.includes("lidar_sectors");
       if (!$("lidar").hidden)
-        await call("subscribe", { topic: "lidar_sectors", hz: 5 }, 3000);
+        await call("subscribe", { topic: "lidar_sectors", hz: homeNetwork ? 1 : 5 }, handshakeTimeout);
       if (ws !== socket) return;
+      subscriptionsReady = true;
+      idleTelemetryTimeout = homeNetwork ? 6000 : 2200;
       accepted = true;
       resolve({deviceId:h.device_id, host});
       $("connection").textContent = "Connected";
@@ -132,6 +138,7 @@ function connect(host, expectedId) {
     if (ws !== socket) return;
     clearTimeout(opening);
     socket.onclose = socket.onopen = socket.onmessage = null;
+    subscriptionsReady = false;
     ws = null;
     socket.close();
     for (const p of pending.values()) {

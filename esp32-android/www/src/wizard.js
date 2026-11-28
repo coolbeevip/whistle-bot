@@ -45,7 +45,7 @@ $("configureHome").onclick = () => {
 function offerSwitch(net) {
   if (wizardStep !== "configure" || !net.home_ssid || !validBoard(net.home_ip) || net.busy) return;
   if (net.home_ssid !== savedNetwork || net.message !== "Connected and saved.") return;
-  identified = {...identified, host:net.home_ip};
+  identified = {deviceId:identified.deviceId, host:net.home_ip, source:"wifi", ssid:net.home_ssid};
   $("switchHint").textContent = "Join " + net.home_ssid + " in phone Wi-Fi settings. Then find " + identified.deviceId + " to finish.";
   step("switch");
   if (ws) reconnectSilentSocket();
@@ -54,7 +54,7 @@ function wizardDisconnected() {
   if (!wizardStep) return false;
   if (wizardStep === "switch") return true;
   if (wizardStep === "configure" && identified && savedNetwork) {
-    identified = {deviceId:identified.deviceId};
+    identified = {deviceId:identified.deviceId, source:"wifi", ssid:savedNetwork};
     $("switchHint").textContent = "Connection lost before confirmation. If the rover light is solid green, join " + savedNetwork + " and find " + identified.deviceId + ".";
     step("switch");
   } else if (wizardStep === "configure" || wizardStep === "identified") {

@@ -29,9 +29,9 @@ async function renewPrecision() {
 }
 
 setInterval(async () => {
-  if (session && lastSample && Date.now() - lastSample > 1000) {
+  if (subscriptionsReady && lastSample && Date.now() - lastSample > 1000) {
     const scanning = (page === "settings" || wizardStep === "configure") && Date.now() < scanGraceUntil;
-    if (lease || mode || (!scanning && Date.now() - lastSample > 2200)) reconnectSilentSocket();
+    if (lease || mode || (!scanning && Date.now() - lastSample > idleTelemetryTimeout)) reconnectSilentSocket();
     else render();
     return;
   }

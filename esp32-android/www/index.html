@@ -35,6 +35,18 @@
   </dialog>
   <section id="garage" aria-labelledby="garageTitle">
     <div class="garage-heading"><h2 id="garageTitle">Your rovers</h2><button id="addRover" aria-label="Add rover">Add</button></div>
+    <template id="wifiIcon">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2.5 8.5a15 15 0 0 1 19 0M6 12a9.8 9.8 0 0 1 12 0M9.5 15.5a4.5 4.5 0 0 1 5 0"/>
+        <circle cx="12" cy="19" r="1.25" fill="currentColor" stroke="none"/>
+      </svg>
+    </template>
+    <template id="hotspotIcon">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 4.5a9.5 9.5 0 0 0 0 15M18 4.5a9.5 9.5 0 0 1 0 15M8.5 8a5.3 5.3 0 0 0 0 8M15.5 8a5.3 5.3 0 0 1 0 8"/>
+        <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>
+      </svg>
+    </template>
     <div id="roverCards"></div>
     <p id="selectionStatus" role="status"></p>
     <button id="retryRover" hidden>Retry</button>

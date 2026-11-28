@@ -11,8 +11,12 @@ if (validDevice(legacyId) && !rovers.some(r => r.deviceId === legacyId)) {
 }
 let selecting = 0, selectedRover, retrySelection;
 
+function connectionSource(rover) {
+  return rover.source || (rover.host === hotspotAddress ? "hotspot" : "wifi");
+}
 function remember(rover) {
-  const existing = rovers.find(r => r.deviceId === rover.deviceId);
+  const source = connectionSource(rover);
+  const existing = rovers.find(r => r.deviceId === rover.deviceId && connectionSource(r) === source);
   if (existing) Object.assign(existing, rover);
   else rovers.push(rover);
   localStorage.setItem("esp32.rovers", JSON.stringify(rovers));
@@ -28,12 +32,23 @@ function showGarage(message = "") {
   $("roverCards").replaceChildren();
   for (const rover of rovers) {
     const button = document.createElement("button");
-    const chassis = document.createElement("span");
-    chassis.className = "rover-symbol";
-    chassis.setAttribute("aria-hidden", "true");
+    const chassis = document.createElement("img");
+    chassis.className = "rover-image";
+    chassis.src = "/assets/esp32-s3-devkitc-1-v1.1-isometric.png";
+    chassis.alt = "";
     const name = document.createElement("span");
     name.textContent = rover.deviceId;
-    button.append(chassis, name);
+    const network = document.createElement("span");
+    const hotspot = connectionSource(rover) === "hotspot";
+    network.className = "rover-network";
+    const ssid = document.createElement("span");
+    ssid.textContent = rover.ssid || (hotspot ? rover.deviceId : "Wi-Fi");
+    network.append($(hotspot ? "hotspotIcon" : "wifiIcon").content.cloneNode(true), ssid);
+    network.title = (hotspot ? "Hotspot" : "Wi-Fi") + " · " + ssid.textContent;
+    network.dataset.source = hotspot ? "hotspot" : "wifi";
+    name.className = "rover-id";
+    button.setAttribute("aria-label", rover.deviceId + ", " + network.title);
+    button.append(network, chassis, name);
     button.onclick = () => selectRover(rover);
     $("roverCards").append(button);
   }
@@ -63,17 +78,18 @@ async function selectRover(rover, onMatch = enterRover) {
     let match;
     if (validBoard(rover.host)) {
       try { match = await connect(rover.host, rover.deviceId); }
-      catch (error) { if (!rover.deviceId || error.message === "ROVER_BUSY") throw error; }
+      catch (error) { if (!rover.deviceId || connectionSource(rover) === "hotspot" || error.message === "ROVER_BUSY") throw error; }
     }
     if (token !== selecting) return;
     if (!match) {
       const found = await window.Capacitor?.Plugins?.RoverDiscovery?.find({deviceId:rover.deviceId});
       if (token !== selecting) return;
       if (!found || found.deviceId !== rover.deviceId || !validBoard(found.host)) throw Error("Rover unavailable");
+      if (found.host === hotspotAddress) throw Error("Join the rover’s home Wi-Fi first");
       match = await connect(found.host, rover.deviceId);
     }
     if (token !== selecting) return;
-    await onMatch(match, token);
+    await onMatch({...rover, ...match, source:connectionSource(rover)}, token);
   } catch (error) {
     if (token !== selecting) return;
     if (ws) reconnectSilentSocket();
@@ -99,7 +115,14 @@ $("retryRover").onclick = () => retrySelection?.();
 $("cancelSelection").onclick = $("closeWizard").onclick = cancelSelection;
 function enterRover(match) {
   selectedRover = match;
+  if (match.source === "hotspot") match.ssid = match.deviceId;
   remember(match);
+  if (match.source === "wifi") {
+    const socket = ws;
+    call("wifi_status").then(net => {
+      if (ws === socket && net.home_ssid && net.home_ip) remember({...match, ssid:net.home_ssid});
+    }).catch(() => {}); // The card stays usable if network metadata is temporarily unavailable.
+  }
   resetWizard();
   retrySelection = null;
   $("garage").hidden = true;

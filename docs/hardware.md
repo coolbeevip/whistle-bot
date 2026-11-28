@@ -36,7 +36,7 @@
 | CS | 3V3 | 选择 I²C 模式 |
 | INT1、INT2 | 留空 | 首次调试用轮询读取 |
 
-VCC 和 CS 共用 3V3，GND 和 SA0/SDO 共用地。首次验证时，用 ESP32 的 USB 供电即可。按 LSM6DSR 规格，先扫描地址 `0x6A`，再读寄存器 `WHO_AM_I`（`0x0F`），预期返回 `0x6B`。实机通过 USB 调用固件的 `imu_probe`，连续三次在 `0x6A` 读到 `0x6B`。固件独立采集芯片坐标系的三轴加速度（含重力，单位 g）和三轴角速度（°/s），控制台在 **Drive → Vehicle telemetry → IMU660RB** 以约 5 Hz 显示。[ST LSM6DSR 数据手册](https://www.st.com/resource/en/datasheet/lsm6dsr.pdf)
+VCC 和 CS 共用 3V3，GND 和 SA0/SDO 共用地。首次验证时，用 ESP32 的 USB 供电即可。按 LSM6DSR 规格，先扫描地址 `0x6A`，再读寄存器 `WHO_AM_I`（`0x0F`），预期返回 `0x6B`。实机通过 USB 调用固件的 `imu_probe`，连续三次在 `0x6A` 读到 `0x6B`。固件独立采集芯片坐标系的三轴加速度（含重力，单位 g）和三轴角速度（°/s），控制台在 **Drive → Vehicle telemetry → IMU660RB** 显示（小车热点约 5 Hz，家庭 Wi-Fi 约 3 Hz）。[ST LSM6DSR 数据手册](https://www.st.com/resource/en/datasheet/lsm6dsr.pdf)
 
 ## 轮子映射与标定
 

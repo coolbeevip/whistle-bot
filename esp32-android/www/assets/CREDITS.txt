@@ -1,0 +1,4 @@
+ESP32-S3-DevKitC-1 v1.1 photograph by Espressif Systems.
+Source: https://github.com/espressif/esp-dev-kits/blob/master/docs/_static/esp32-s3-devkitc-1/esp32-s3-devkitc-1-v1.1-isometric.png
+License: CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/
+The original image is distributed unchanged.
