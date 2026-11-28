@@ -22,3 +22,5 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 首次配置与热点恢复见[控制器指南](../docs/controller.md)。触控回归测试与真机检查见[验收说明](../docs/controller-acceptance.md)。
 
 同车多手机使用时，需配套支持 `exclusive_ws` 的 ESP32 固件。第一部手机退出后，第二部手机可重新点选。
+
+在驾驶或设置页点 **Rovers** 返回选车。驾驶中需确认 **Stop and return**，待小车反馈停稳且控制权已释放后返回。断线时可手动重连原车，或在现场确认停稳后返回。标定期间先完成保存或取消，再返回选车。

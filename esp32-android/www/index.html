@@ -12,9 +12,19 @@
 <body data-page="drive" data-selecting="true">
   <header>
     <h1><span class="mark" aria-hidden="true"></span>Whistle Bot</h1>
+    <button id="returnRovers" disabled>Rovers</button>
     <output class="sr-only" id="connection">Connecting…</output>
     <div class="rover-power"><span class="sr-only">Rover battery </span><strong id="battery">—</strong></div>
   </header>
+  <output id="driveToast" role="status" hidden></output>
+  <dialog id="departureDialog" aria-labelledby="departureTitle">
+    <h2 id="departureTitle"></h2>
+    <p id="departureStatus" role="status"></p>
+    <button id="stopAndReturn">Stop and return</button>
+    <button id="stayRover">Stay here</button>
+    <button id="reconnectRover" hidden></button>
+    <button id="confirmedRest" hidden>I checked the rover is stopped. Return to rovers</button>
+  </dialog>
   <section id="garage" aria-labelledby="garageTitle">
     <h2 id="garageTitle">Your rovers</h2>
     <div id="roverCards"></div>
@@ -163,7 +173,6 @@
       </div>
     </section>
     <section id="settings" aria-label="Settings" hidden>
-      <button id="returnRovers" disabled>Return to rovers</button>
       <div class="settings-tabs" role="group" aria-label="Settings panels">
         <button data-panel="wifiPanel" aria-controls="wifiPanel" aria-pressed="true">Wi-Fi</button>
         <button data-panel="chassisPanel" aria-controls="chassisPanel" aria-pressed="false">Chassis</button>
@@ -298,6 +307,7 @@
   </nav>
   </footer>
   <script defer src="/src/console.js"></script>
+  <script defer src="/src/departure.js"></script>
   <script defer src="/src/connection.js"></script>
   <script defer src="/src/garage.js"></script>
   <script defer src="/src/drive.js"></script>

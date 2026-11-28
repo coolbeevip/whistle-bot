@@ -73,6 +73,7 @@ function showActual(ready) {
 let feedbackTimer;
 function say(message) {
   clearTimeout(feedbackTimer);
+  if (page === "drive" && message) driveNotice(message);
   $("feedback").textContent = message;
   $("feedback").parentElement.classList.toggle("has-message", !!message);
   if (page === "drive" && message) feedbackTimer = setTimeout(() => say(""), 4500);
@@ -194,14 +195,15 @@ function render() {
     !busy
   );
   const saved = savedParams();
-  const navigationLocked = !!lease || !!held || busy;
+  const navigationLocked = !!lease || !!held || busy || !!calibrationExit;
   for (const id of ["drive", "settings", "cal"]) $(id).hidden = page !== id;
   for (const tab of document.querySelectorAll("nav [data-page]")) {
     const selected = tab.dataset.page === (page === "cal" ? "settings" : page);
     tab.setAttribute("aria-current", selected ? "page" : "false");
     tab.disabled = navigationLocked && tab.dataset.page !== page;
   }
-  $("returnRovers").disabled = navigationLocked || !ready || !free || !last.settled;
+  $("returnRovers").disabled = !session || !!calibrationExit || !!stage || mode === "cal" || (page === "cal" && busy);
+  $("returnRovers").hidden = document.body.dataset.selecting === "true";
   $("calBack").disabled = navigationLocked;
   const needsCalibration = !last.distance_ready || (turning && last.precision_ready == null && !last.calibrated);
   $("precisionCalibration").hidden = !(page === "drive" && precision && ready && free &&
@@ -211,6 +213,9 @@ function render() {
     mode === "manual" ? "Driving" : mode === "claim" ? "Getting ready" : last.owner === "self" ? "This device has control" : !last.settled ? "Waiting for wheels to stop" :
     page === "drive" && precision && !actionReady ? (!last.distance_ready ? (saved?.mapped ? "Verify distance calibration" : "Set wheel directions first") : last.yaw_ready === false ? "Keep the IMU still on level ground" : turning && last.precision_ready == null ? "Verify distance and angle calibration" : "Verify distance calibration") :
     !last.manual_ready ? "Set wheel directions first" : "";
+  const notice = $("availability").textContent;
+  if (notice !== lastDriveNotice && page === "drive" && drivePanel === "manual" && selectedRover && $("garage").hidden && notice) driveNotice(notice);
+  lastDriveNotice = notice;
   $("overview").hidden = !!stage || !$("trialResult").hidden;
   $("wizard").hidden = !stage;
   $("wizard").disabled = mode !== "cal" || busy;
@@ -219,7 +224,7 @@ function render() {
     const missing = key === "distance" && !saved?.mapped ? "Save wheel directions first" :
       key === "turn" && !saved?.left_mm_tick ? "Save distance first" : "";
     $(key+"State").textContent = missing || stageState(saved,key);
-    button.disabled = landscape.matches || !!missing || !ready || !free || !last.settled || busy;
+    button.disabled = !!calibrationExit || landscape.matches || !!missing || !ready || !free || !last.settled || busy;
   }
   if (stage) {
     const c = last.calibration;

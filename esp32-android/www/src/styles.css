@@ -306,3 +306,12 @@ body[data-page="settings"] :is(.drive-summary, #vehicleTelemetry, #lidar) { disp
 #networkWizard p { margin:.25rem 0; }
 #networkWizard #closeWizard { justify-self:start; }
 #garage { padding-bottom:calc(1rem + env(safe-area-inset-bottom)); }
+
+body[data-selecting=true] #returnRovers, body[data-selecting=true] #driveToast,
+body[data-page=drive] #stickFooter .status-slot { display:none; }
+#returnRovers { margin-inline-start:auto; min-height:36px; padding:5px 12px; }
+#driveToast, #departureDialog { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:var(--card-radius); }
+#driveToast { position:fixed; z-index:5; top:50%; left:50%; transform:translate(-50%,-50%); width:max-content; max-width:82vw; padding:10px 14px; text-align:center; pointer-events:none; }
+#departureDialog { width:min(90vw,26rem); padding:1rem; }
+#departureDialog::backdrop { background:#0009; }
+#departureDialog button { margin-block:.25rem; }

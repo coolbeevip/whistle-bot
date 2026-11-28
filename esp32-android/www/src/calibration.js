@@ -32,12 +32,7 @@ for (const button of document.querySelectorAll("[data-stage]")) {
   });
 }
 $("cancel").onclick = () =>
-  guarded(async () => {
-    trialStage = "";
-  await call("cal_cancel");
-    clearLocal();
-    render();
-  });
+  guarded(() => endCalibration("cal_cancel"));
 function sample(step, fields = {}) {
   return call("cal_sample", { step, ...fields });
 }
@@ -117,10 +112,5 @@ $("save").onclick = () => editStage(async () => {
       m[k] = Number($(k).value);
     await sample("map",m);
   }
-  const testingStage = trialStage;
-  trialStage = "";
-  try { await call("cal_checkpoint"); }
-  catch (e) { if (lease) trialStage = testingStage; throw e; }
-  clearLocal();
-  say("Saving…");
+  await endCalibration("cal_checkpoint");
 });

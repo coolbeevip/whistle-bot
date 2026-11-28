@@ -36,6 +36,7 @@ function showGarage(message = "") {
   $("cancelSelection").hidden = true;
 }
 function connectionEnded() {
+  if (departure) { showDeparture("offline"); return; }
   if (wizardDisconnected()) return;
   if (selectedRover) retrySelection = () => selectRover(selectedRover);
   showGarage("Disconnected. Select a rover to reconnect.");
@@ -70,6 +71,10 @@ async function selectRover(rover, onMatch = enterRover) {
   } catch (error) {
     if (token !== selecting) return;
     if (ws) reconnectSilentSocket();
+    if (departure) {
+      showDeparture("offline", error.message === "ROVER_BUSY" ? "This rover is connected to another phone." : error.message);
+      return;
+    }
     if (error.message === "ROVER_BUSY") {
       retrySelection = rover.deviceId ? () => selectRover(rover) : null;
       showGarage("This rover is connected to another phone.");
@@ -94,8 +99,5 @@ function enterRover(match) {
   $("garage").hidden = true;
   document.body.dataset.selecting = "false";
   showPage("drive");
+  driveNotice("Connected to " + match.deviceId);
 }
-
-$("returnRovers").onclick = () => {
-  if (session && !busy && !lease && !held && !mode && last.owner === "free" && last.settled && Date.now() - lastSample <= 1000) cancelSelection();
-};

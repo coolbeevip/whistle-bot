@@ -7,7 +7,7 @@ class Controller {
     this.saved = {mapped: true, checks: 3, revision: 1, left_channel: 3,
       left_motor_sign: -1, right_motor_sign: 1, left_encoder_sign: -1, right_encoder_sign: 1,
       left_mm_tick: 0.12, right_mm_tick: 0.12, track_mm: 140};
-    this.state = {driver_online: true, manual_ready: true, distance_ready: true, calibrated: true,
+    this.state = {boot_id:19, driver_online: true, manual_ready: true, distance_ready: true, calibrated: true,
       manual_max_mm_s: 1000, settled: true, owner: "free", action_state: "idle", reason: "ready"};
     this.net = {setup_allowed: true, networks: [], scan_state: "idle", home_ssid: ""};
     this.packets = [];
@@ -38,7 +38,7 @@ class Controller {
     const reject = error => this.send({id: m.id, ok: false, error, owner: this.state.owner});
     if (m.op !== "hello" && m.session !== 41) return reject("BAD_SESSION");
     switch (m.op) {
-      case "hello": return reply({device_id:this.deviceId || "Whistle-A00001", session: 41, basic_ticks_max: 9000, capabilities: ["move_speed"]});
+      case "hello": return reply({device_id:this.deviceId || "Whistle-A00001", boot_id:this.state.boot_id, session: 41, basic_ticks_max: 9000, capabilities: ["move_speed"]});
       case "status": return reply(this.snapshot());
       case "subscribe": return reply();
       case "wifi_status": return reply(this.net);
@@ -52,6 +52,7 @@ class Controller {
         return reply({lease: ++this.lease, window: this.window, accepted_ms: ++this.clock});
       case "stop":
         reply();
+        if (this.deferStop) return;
         return this.event({owner: "free", settled: true, action_state: "idle"});
     }
     if (m.lease !== this.lease || this.state.owner !== "self") return reject("NOT_OWNER");
@@ -72,6 +73,12 @@ class Controller {
         }
         return reply();
       case "cal_checkpoint": case "cal_cancel": case "release":
+        if (this.deferCalibration && m.op !== "release") {
+          this.state.owner = "free";
+          this.state.reason = m.op === "cal_checkpoint" ? "saving" : "released";
+          if (m.op === "cal_cancel") this.state.settled = false;
+          return reply();
+        }
         if (m.op === "cal_checkpoint") this.saved = {...this.draft, revision: this.saved.revision + 1};
         this.draft = null;
         reply();

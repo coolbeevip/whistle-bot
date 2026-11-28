@@ -99,6 +99,8 @@ function connect(host, expectedId) {
       return;
     }
     if (["encoders", "action", "status"].includes(m.event)) {
+      if (m.boot_id !== speedLimits.boot_id) return;
+      if (Number.isFinite(last.t_ms) && ((m.t_ms - last.t_ms) | 0) < 0) return;
       if (lease && acceptedAt !== null && ((m.t_ms - acceptedAt) | 0) < 0) return;
       last = m;
       lastSample = Date.now();
@@ -110,8 +112,8 @@ function connect(host, expectedId) {
           wheel_stalled:"Wheel stalled", lidar_interlock:"Obstacle detected", deadline:"Controller stopped. Press again."};
         say(action && m.action_id ? "" : ownerMessage(m.owner) || reason[m.reason] || (manual ? "Drive stopped. Press again." : "Control released"));
       }
-      if (m.reason === "saved") say("Calibration saved");
-      if (m.reason === "save_failed") say("Save failed. Previous settings retained.");
+      calibrationProgress(m);
+      departureProgress(m);
       render();
       return;
     }
@@ -137,6 +139,11 @@ function connect(host, expectedId) {
       p.reject(Error("Connection lost"));
     }
     pending.clear();
+    if (accepted && selectedRover && !departure &&
+        (lease || held || mode || stage || calibrationExit || last.owner === "self" || last.settled === false)) {
+      beginDeparture();
+    }
+    calibrationExit = null;
     trialInterrupted("Disconnected");
     session = 0;
     $("networkSetup").disabled = true;

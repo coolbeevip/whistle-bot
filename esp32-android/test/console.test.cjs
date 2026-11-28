@@ -157,7 +157,7 @@ test("Basic drive uses the configured gear and stops renewing after a timeout", 
   await packet("drive_low",{left_dir:1,right_dir:1,acceleration:"responsive",
     ticks_s: Math.round(790 / ((Math.PI*67.5/1784 + Math.PI*67.5/1782)/2))});
   board.event({owner:"free", reason:"timeout"});
-  await p.getByText("Drive timed out. Release and press again.").waitFor();
+  await p.locator("#driveToast").getByText("Drive timed out. Release and press again.").waitFor();
   const count = board.packets.length;
   board.renew();
   await sleep(220);
@@ -266,7 +266,7 @@ test("Locks, disconnect and reconnect", async t => {
   const {p,board} = await open(t,b => { b.state.owner = "usb"; });
   assert.ok(await p.locator(".up").isDisabled());
   board.event({owner:"free",driver_online:false});
-  await p.getByText("Motor driver offline",{exact:true}).waitFor();
+  await p.locator("#driveToast").getByText("Motor driver offline",{exact:true}).waitFor();
   assert.ok(await p.locator(".down").isDisabled());
   board.event({driver_online:true,distance_ready:false,calibrated:false});
   await p.getByRole("button",{name:"Precision"}).tap();
@@ -487,6 +487,63 @@ test("Returning from idle settings ends the session and a busy rover stays in th
   assert.ok(await p.locator("main").isHidden());
 });
 
+for (const path of ["telemetry","reconnect","manual"]) {
+  test("Stop and return follows the " + path + " confirmation path", async t => {
+    const {p,board,packet} = await open(t, peer => {peer.deferStop = true;});
+    await p.getByRole("button",{name:"Precision"}).tap();
+    await p.locator("#execute").tap();
+    await packet("move_distance");
+    await p.locator("#returnRovers").tap();
+    await p.locator("#stopAndReturn").tap();
+    await packet("stop");
+    await p.locator("#departureStatus").getByText(/Waiting for the rover/).waitFor();
+    const offset=board.packets.length;
+    if (path === "telemetry") {
+      board.send({...board.snapshot(),event:"encoders",boot_id:18,owner:"free",settled:true});
+      board.send({...board.snapshot(),event:"encoders",t_ms:0,owner:"free",settled:true});
+      board.event({owner:"free",settled:false});
+      assert.ok(await p.locator("#departureDialog").isVisible());
+      board.event({settled:true});
+    } else {
+      board.socket.close();
+      await p.locator("#departureStatus").getByText(/Disconnected/).waitFor();
+      if (path === "manual") await p.locator("#confirmedRest").tap();
+      else {
+        Object.assign(board.state,{owner:"free",settled:true});
+        await p.locator("#reconnectRover").tap();
+        await packet("subscribe",{},offset);
+        await p.locator("#departureStatus").getByText(/Waiting for the rover/).waitFor();
+        board.event();
+      }
+    }
+    await p.locator("#garage").waitFor();
+    assert.ok(await p.locator("#departureDialog").isHidden());
+    assert.ok(board.packets.slice(offset).every(m => ["hello","subscribe","status"].includes(m.op)));
+  });
+}
+
+for (const result of ["saved","save_failed","cancel"]) {
+  test("Calibration keeps return locked through " + result, async t => {
+    const {p,board,packet} = await open(t, peer => {peer.deferCalibration = true;});
+    await enterStage(p,result === "cancel" ? "distance" : "mapping");
+    if (result === "cancel") {
+      await p.locator("#trial").tap();
+      await packet("cal_sample",{step:"trial"});
+      await p.getByText("Test in progress").waitFor();
+    }
+    assert.ok(await p.locator("#returnRovers").isDisabled());
+    const offset = board.packets.length;
+    await p.locator(result === "cancel" ? "#cancel" : "#save").tap();
+    await packet("status",{},offset);
+    assert.ok(await p.locator("#returnRovers").isDisabled());
+    if (result === "saved") board.saved = {...board.saved,revision:board.saved.revision+1};
+    board.event({owner:"free",settled:true,reason:result === "cancel" ? "released" : result});
+    await until(()=>p.locator("#returnRovers").isEnabled(),"calibration exit confirmed");
+    if (result !== "cancel") assert.match(await p.locator("#feedback").innerText(),result==="saved" ? /saved/ : /Save failed/);
+    assert.ok(await p.locator("#garage").isHidden());
+  });
+}
+
 test("IMU telemetry shows signed values on each axis and clears stale samples", async t => {
   const {p,board} = await open(t);
   await p.locator("#imuReadings").waitFor();
@@ -540,12 +597,12 @@ test("Joystick shows notices only when needed and keeps the pad stationary", asy
   assert.ok(await slot.isHidden());
   const before = await pad.boundingBox();
   board.event({owner:"usb"});
-  await slot.getByText("USB host is driving").waitFor();
+  await p.locator("#driveToast").getByText("USB host is driving").waitFor();
   assert.deepEqual(await pad.boundingBox(), before);
   board.event({owner:"free"});
   await slot.waitFor({state:"hidden"});
   await p.evaluate(() => say("Drive timed out. Release and press again."));
-  await slot.getByText("Drive timed out. Release and press again.").waitFor();
+  await p.locator("#driveToast").getByText("Drive timed out. Release and press again.").waitFor();
   assert.deepEqual(await pad.boundingBox(), before);
 });
 
@@ -687,7 +744,7 @@ test("Precision renews fresh windows during a delayed heartbeat and shows one ti
 test("A silent open socket expires and telemetry resumes without replaying movement", async t => {
   const {p, board, packet} = await open(t);
   const start = board.packets.length;
-  await p.getByText("Telemetry delayed", {exact:true}).waitFor();
+  await p.locator("#driveToast").getByText("Telemetry delayed", {exact:true}).waitFor();
   assert.ok(await p.locator(".up").isDisabled());
   assert.equal(await p.textContent("#m3"), "—");
   await p.locator("#retryRover").tap();
