@@ -201,6 +201,7 @@ function render() {
     tab.setAttribute("aria-current", selected ? "page" : "false");
     tab.disabled = navigationLocked && tab.dataset.page !== page;
   }
+  $("returnRovers").disabled = navigationLocked || !ready || !free || !last.settled;
   $("calBack").disabled = navigationLocked;
   const needsCalibration = !last.distance_ready || (turning && last.precision_ready == null && !last.calibrated);
   $("precisionCalibration").hidden = !(page === "drive" && precision && ready && free &&

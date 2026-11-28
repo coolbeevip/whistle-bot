@@ -70,6 +70,11 @@ async function selectRover(rover, onMatch = enterRover) {
   } catch (error) {
     if (token !== selecting) return;
     if (ws) reconnectSilentSocket();
+    if (error.message === "ROVER_BUSY") {
+      retrySelection = rover.deviceId ? () => selectRover(rover) : null;
+      showGarage("This rover is connected to another phone.");
+      return;
+    }
     if (!$("networkWizard").hidden) {
       $("selectionStatus").textContent = error.message + ". Try again or return to rovers.";
       $("cancelSelection").hidden = true;
@@ -90,3 +95,7 @@ function enterRover(match) {
   document.body.dataset.selecting = "false";
   showPage("drive");
 }
+
+$("returnRovers").onclick = () => {
+  if (session && !busy && !lease && !held && !mode && last.owner === "free" && last.settled && Date.now() - lastSample <= 1000) cancelSelection();
+};

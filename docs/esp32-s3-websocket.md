@@ -44,6 +44,10 @@
 
 设备通过 mDNS 广播 `_whistlebot._tcp.local.`，实例名与热点名相同。手机连接服务地址上的 `/ws`，核对 `hello.device_id` 与所选车辆一致后再订阅。该标识跨重启和 DHCP 换址保持稳定，`boot_id` 标识一次启动。选车首页需要能返回稳定标识的固件。
 
+## 手机连接独占
+
+固件在 `hello.capabilities` 中声明 `exclusive_ws` 时，热点与家庭 Wi-Fi 共用一个 WebSocket 连接名额。第一部手机进入设置页或释放驾驶租约后仍占用连接。后来的连接发送首帧时收到 `rover_busy` 事件和该车的 `device_id`。车端忽略其命令。客户端核对标识后关闭连接并显示占用提示。当前连接断开后，另一部手机可手动接入。mDNS 始终可用于发现。
+
 ## 控制权与续期
 
 底盘空闲、驱动反馈有效且车轮停稳时可申请控制。普通驾驶还要求方向映射有效。成功的 `claim` 或 `cal_begin` 应答包含 `lease`、`window`、`accepted_ms` 和 `expires_at_ms`。窗口编号由设备生成，客户端应原样回传。

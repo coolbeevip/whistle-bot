@@ -474,6 +474,19 @@ test("LAN wizard waits for selection with zero, one and multiple results and ign
   assert.equal(board.packets.length,start);
 });
 
+test("Returning from idle settings ends the session and a busy rover stays in the garage", async t => {
+  const {p,board} = await open(t);
+  await p.locator("#settingsButton").tap();
+  await p.locator("#returnRovers").tap();
+  assert.ok(await p.locator("#garage").isVisible());
+  const start = board.packets.length;
+  await p.routeWebSocket("ws://rover.test/ws", socket => socket.onMessage(() => socket.send(JSON.stringify({v:1,event:"rover_busy",device_id:"Whistle-A00001"}))));
+  await p.getByRole("button",{name:"Whistle-A00001"}).tap();
+  await p.getByText("This rover is connected to another phone.",{exact:true}).waitFor();
+  assert.equal(board.packets.length,start);
+  assert.ok(await p.locator("main").isHidden());
+});
+
 test("IMU telemetry shows signed values on each axis and clears stale samples", async t => {
   const {p,board} = await open(t);
   await p.locator("#imuReadings").waitFor();

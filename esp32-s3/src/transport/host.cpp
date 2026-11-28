@@ -19,7 +19,7 @@ struct Client {
     String frame;
     Session session;
 };
-Client clients[4];
+Client phone;
 Session usb;
 String line;
 bool discard = false;
@@ -32,40 +32,33 @@ void websocket(AsyncWebSocket *, AsyncWebSocketClient *socket, AwsEventType type
         return;
     const uint32_t receivedAt = millis();
     xSemaphoreTake(guard, portMAX_DELAY);
-    Client *slot = nullptr;
-    for (auto &c : clients)
-        if (c.id == socket->id()) {
-            slot = &c;
-            break;
-        }
+    const bool current = phone.id == socket->id();
     if (type == WS_EVT_CONNECT) {
-        for (auto &c : clients)
-            if (!c.id) {
-                c.id = socket->id();
-                slot = &c;
-                break;
-            }
-        if (!slot)
-            socket->close(1013, "busy");
-    } else if (slot && type == WS_EVT_DISCONNECT) {
-        stopSession(slot->session.sid);
-        *slot = Client{};
-    } else if (slot && type == WS_EVT_DATA) {
+        if (phone.id)
+            socket->client()->setRxTimeout(3);
+        else
+            phone.id = socket->id();
+    } else if (current && type == WS_EVT_DISCONNECT) {
+        stopSession(phone.session.sid);
+        phone = Client{};
+    } else if (!current && type == WS_EVT_DATA) {
+        socket->text(String("{\"v\":1,\"event\":\"rover_busy\",\"device_id\":\"") + controllerName() + "\"}");
+    } else if (current && type == WS_EVT_DATA) {
         auto *f = static_cast<AwsFrameInfo *>(arg);
         if (f->index == 0 && f->num == 0)
-            slot->frame = "";
-        if (f->message_opcode != WS_TEXT || f->len > 1024 || slot->frame.length() + size > 1024) {
-            stopSession(slot->session.sid);
+            phone.frame = "";
+        if (f->message_opcode != WS_TEXT || f->len > 1024 || phone.frame.length() + size > 1024) {
+            stopSession(phone.session.sid);
             socket->close(1009, "frame");
         } else {
-            slot->frame.concat(reinterpret_cast<char *>(data), size);
+            phone.frame.concat(reinterpret_cast<char *>(data), size);
             if (f->final && f->index + size == f->len) {
-                String reply = handleFrame(slot->session, slot->frame, receivedAt, false, socket->client()->localIP() == WiFi.softAPIP());
+                String reply = handleFrame(phone.session, phone.frame, receivedAt, false, socket->client()->localIP() == WiFi.softAPIP());
                 if (!socket->text(reply)) {
-                    stopSession(slot->session.sid);
+                    stopSession(phone.session.sid);
                     socket->close();
                 }
-                slot->frame = "";
+                phone.frame = "";
             }
         }
     }
@@ -146,23 +139,22 @@ void serviceHosts() {
     xSemaphoreGive(guard);
     // AsyncWebServer can call connect/disconnect while holding its client-list
     // lock. Never look up a server client while holding the session mutex.
-    for (auto &c : clients) {
-        xSemaphoreTake(guard, portMAX_DELAY);
-        uint32_t clientId = c.id;
-        uint32_t sessionId = c.session.sid;
-        e = clientId ? eventFrame(c.session, now, window) : String();
-        xSemaphoreGive(guard);
-        if (!clientId || !e.length()) continue;
+    xSemaphoreTake(guard, portMAX_DELAY);
+    uint32_t clientId = phone.id;
+    uint32_t sessionId = phone.session.sid;
+    e = clientId ? eventFrame(phone.session, now, window) : String();
+    xSemaphoreGive(guard);
+    if (clientId && e.length()) {
         bool sent = ws.availableForWrite(clientId) && ws.text(clientId, e);
         if (window.id) {
             recordWindowAttempt(window, sent, millis());
             xSemaphoreTake(guard, portMAX_DELAY);
-            if (c.id == clientId && c.session.sid == sessionId) c.session.windows.finish(window, sent);
+            if (phone.id == clientId && phone.session.sid == sessionId) phone.session.windows.finish(window, sent);
             xSemaphoreGive(guard);
         }
     }
     if (elapsed(now, cleanupAt, 1000)) {
-        ws.cleanupClients(4);
+        ws.cleanupClients(UINT16_MAX);
         cleanupAt = now;
     }
     delay(2);

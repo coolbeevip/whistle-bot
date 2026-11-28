@@ -71,6 +71,11 @@ function connect(host, expectedId) {
     } catch {
       return;
     }
+    if (!accepted && m.event === "rover_busy") {
+      const occupied = validDevice(m.device_id) && (!expectedId || m.device_id === expectedId);
+      disconnectCurrent(Error(occupied ? "ROVER_BUSY" : "Different rover"));
+      return;
+    }
     if (m.event === "lidar_sectors") {
       $("sectors").textContent = m.sectors
         .map(
@@ -117,7 +122,10 @@ function connect(host, expectedId) {
     if (m.ok) p.resolve(m);
     else p.reject(Object.assign(Error(m.error || "Request failed"), {owner:m.owner, window:m.window, lease:m.lease}));
   };
-  ws.onclose = () => disconnectCurrent();
+  ws.onclose = event => {
+    const occupied = event.code === 4009 && validDevice(event.reason) && (!expectedId || expectedId === event.reason);
+    disconnectCurrent(occupied ? Error("ROVER_BUSY") : undefined);
+  };
   function disconnectCurrent(error) {
     if (ws !== socket) return;
     clearTimeout(opening);
