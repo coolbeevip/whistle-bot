@@ -19,6 +19,7 @@ function remember(rover) {
 }
 function showGarage(message = "") {
   document.body.dataset.selecting = "true";
+  $("headerRover").hidden = true;
   $("garage").hidden = false;
   resetWizard();
   $("networkWizard").hidden = true;
@@ -27,7 +28,12 @@ function showGarage(message = "") {
   $("roverCards").replaceChildren();
   for (const rover of rovers) {
     const button = document.createElement("button");
-    button.textContent = rover.deviceId;
+    const chassis = document.createElement("span");
+    chassis.className = "rover-symbol";
+    chassis.setAttribute("aria-hidden", "true");
+    const name = document.createElement("span");
+    name.textContent = rover.deviceId;
+    button.append(chassis, name);
     button.onclick = () => selectRover(rover);
     $("roverCards").append(button);
   }
@@ -98,6 +104,8 @@ function enterRover(match) {
   retrySelection = null;
   $("garage").hidden = true;
   document.body.dataset.selecting = "false";
+  $("headerRover").textContent = match.deviceId;
+  $("headerRover").hidden = false;
   showPage("drive");
   driveNotice("Connected to " + match.deviceId);
 }

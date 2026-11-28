@@ -17,7 +17,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 ## 连接小车
 
-打开 **Whistle Bot** 会先看到已添加的小车。在 **Add rover** 中可连接小车热点并识别车辆，也可以在同一家庭 Wi-Fi 下点 **Search rovers**，从结果中点选目标车。热点识别后可直接添加并驾驶，或继续设置 2.4 GHz 家庭网络。配置完成后将手机切到同一网络，点 **Find this rover** 核对身份。点选卡片后 App 核对车辆身份，旧地址失效时通过 mDNS 查找同一辆车。
+打开 **Whistle Bot** 会先看到已添加的小车。在 **Add** 中可连接小车热点并识别车辆，也可以在同一家庭 Wi-Fi 下点 **Search**，从结果中点选目标车。热点识别后可直接添加并驾驶，或继续设置 2.4 GHz 家庭网络。配置完成后将手机切到同一网络，点 **Find this rover** 核对身份。点选卡片后 App 核对车辆身份，旧地址失效时通过 mDNS 查找同一辆车。
 
 首次配置与热点恢复见[控制器指南](../docs/controller.md)。触控回归测试与真机检查见[验收说明](../docs/controller-acceptance.md)。
 

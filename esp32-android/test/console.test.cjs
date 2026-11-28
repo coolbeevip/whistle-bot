@@ -222,13 +222,13 @@ test("Wheel mapping: individual motor jog, release, save and discard", async t =
     await packet("cal_sample",{step:"jog",channel,direction:1,spin:false},offset);
     await packet("cal_sample",{step:"jog_stop"},offset);
   }
-  await p.selectOption("#leftChannel","4");
-  await p.selectOption("#right_motor_sign","-1");
+  await p.locator("#leftChannel").getByRole("button",{name:"M4"}).tap();
+  await p.locator("#right_motor_sign").getByRole("button",{name:"Reverse −1"}).tap();
   await p.locator("#save").tap();
   await packet("cal_sample",{step:"map",left_channel:4,left_motor_sign:-1,right_motor_sign:-1,left_encoder_sign:-1,right_encoder_sign:1});
   await packet("cal_checkpoint");
   await enterStage(p,"mapping");
-  assert.equal(await p.inputValue("#leftChannel"),"4");
+  assert.equal(await p.locator("#leftChannel [aria-pressed=true]").getAttribute("value"),"4");
   await p.locator("#cancel").tap();
   await packet("cal_cancel");
 });
@@ -284,26 +284,29 @@ test("LAN scan lists networks while credential changes require the rover hotspot
   await p.locator("#settingsButton").tap();
   await p.locator("#scanWifi").tap();
   await packet("wifi_scan");
-  await p.locator("#nearby").selectOption("Test AP");
+  await p.locator("#nearby").getByRole("button",{name:"Test AP"}).tap();
   assert.equal(await p.locator("#homeName").inputValue(), "Test AP");
   assert.ok(await p.locator("#testWifi").isDisabled());
   assert.ok(await p.locator("#homePass").isDisabled());
 });
 
 test("Settings: scan, select, save, forget and hotspot recovery", async t => {
-  const {p,packet} = await open(t);
+  const {p,packet,board} = await open(t);
   await p.locator("#settingsButton").tap();
   await p.locator("#scanWifi").tap();
   await packet("wifi_scan");
-  await p.locator("#nearby").selectOption("Test AP");
+  await p.locator("#nearby").getByRole("button",{name:"Test AP"}).tap();
   await p.fill("#homePass","fixture-only");
   await p.getByRole("button",{name:"Show password"}).tap();
   assert.equal(await p.locator("#homePass").getAttribute("type"),"text");
   await p.getByRole("button",{name:"Hide password"}).tap();
   await p.locator("#testWifi").tap();
   await packet("wifi_test",{ssid:"Test AP",password:"fixture-only"});
-  p.once("dialog", d => d.accept());
   await p.locator("#forgetWifi").tap();
+  await p.locator("#keepNetwork").tap();
+  assert.ok(!board.packets.some(m => m.op === "wifi_forget"));
+  await p.locator("#forgetWifi").tap();
+  await p.locator("#confirmForget").tap();
   await packet("wifi_forget");
   await p.locator("#recoveryPanel summary").tap();
   assert.ok(await p.getByText("Hold BOOT for 5 seconds", {exact:false}).isVisible());
@@ -584,7 +587,7 @@ test("Console content uses a shared typeface and size across panels", async t =>
     const text = document.querySelectorAll("main :is(h2,caption,th,td,dt,dd,p,output,small,button,label,legend,input,select)");
     return [...text].filter(el => {
       const style = getComputedStyle(el);
-      return style.fontFamily !== mainStyle.fontFamily || style.fontSize !== mainStyle.fontSize;
+      return style.fontFamily !== mainStyle.fontFamily || (!el.classList.contains("page-title") && style.fontSize !== mainStyle.fontSize);
     }).map(el => el.id || el.tagName);
   });
   assert.deepEqual(mismatches, []);
@@ -649,7 +652,7 @@ test("Narrow layout keeps related drive controls on one line", async t => {
   assert.ok(await p.locator("#speedSetting").isHidden());
   await sameRow(["[data-nudge='-10']", "#goalValue", "[data-nudge='10']"]);
   await p.getByRole("button",{name:"Settings"}).tap();
-  await sameRow(["#nearby","#scanWifi"]);
+  await sameRow(["#nearbyTitle","#scanWifi"]);
   await sameRow(["#homePass","#showPass"]);
 });
 

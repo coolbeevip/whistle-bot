@@ -147,6 +147,7 @@ function connect(host, expectedId) {
     trialInterrupted("Disconnected");
     session = 0;
     $("networkSetup").disabled = true;
+    if ($("forgetDialog").open) $("forgetDialog").close();
     clearLocal();
     last = {};
     busy = false;

@@ -13,9 +13,9 @@ for (const button of document.querySelectorAll("[data-stage]")) {
       $("stageTitle").textContent = titles[stage];
       $("mappingForm").hidden = stage !== "mapping";
       $("sampleForm").hidden = stage === "mapping";
-      $("leftChannel").value = c.left_channel;
+      setMapping("leftChannel", c.left_channel);
       for (const k of ["left_motor_sign","right_motor_sign","left_encoder_sign","right_encoder_sign"])
-        $(k).value = c[k] || 1;
+        setMapping(k, c[k] || 1);
       const turn = stage === "turn";
       $("spin").hidden = !turn;
       $("instructions").textContent = turn ?
@@ -36,20 +36,37 @@ $("cancel").onclick = () =>
 function sample(step, fields = {}) {
   return call("cal_sample", { step, ...fields });
 }
+function setMapping(key, value) {
+  for (const choice of $(key).children)
+    choice.setAttribute("aria-pressed", String(choice.value === String(value)));
+}
+function mappingValue(key) {
+  return Number($(key).querySelector('[aria-pressed="true"]').value);
+}
 for (const [key, label] of [
-  ["left_motor_sign", "Left motor"],
-  ["right_motor_sign", "Right motor"],
-  ["left_encoder_sign", "Left encoder"],
-  ["right_encoder_sign", "Right encoder"],
+  ["leftChannel", "Left wheel"], ["left_motor_sign", "Left motor"],
+  ["right_motor_sign", "Right motor"], ["left_encoder_sign", "Left encoder"],
+  ["right_encoder_sign", "Right encoder"]
 ]) {
-  const lab = document.createElement("label"),
-    select = document.createElement("select");
-  lab.textContent = label;
-  select.id = key;
-  select.add(new Option("Normal +1", "1"));
-  select.add(new Option("Reversed −1", "-1"));
-  lab.append(select);
-  $("mapping").append(lab);
+  const row = document.createElement("div");
+  row.className = "mapping-row";
+  const title = document.createElement("span");
+  title.textContent = label;
+  const group = document.createElement("div");
+  group.id = key;
+  group.setAttribute("role","group");
+  group.setAttribute("aria-label",label);
+  const choices = key === "leftChannel" ? [[3,"M3"],[4,"M4"]] : [[1,"Normal +1"],[-1,"Reverse −1"]];
+  for (const [value,text] of choices) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.value = String(value);
+    button.textContent = text;
+    button.onclick = () => setMapping(key,value);
+    group.append(button);
+  }
+  row.append(title,group);
+  $("mapping").append(row);
 }
 function jogButton(b, channel, spin) {
   b.onpointerdown = (e) =>
@@ -107,9 +124,9 @@ $("trial").onclick = () => editStage(async () => {
 });
 $("save").onclick = () => editStage(async () => {
   if (stage === "mapping") {
-    const m = {left_channel: Number($("leftChannel").value)};
+    const m = {left_channel: mappingValue("leftChannel")};
     for (const k of ["left_motor_sign","right_motor_sign","left_encoder_sign","right_encoder_sign"])
-      m[k] = Number($(k).value);
+      m[k] = mappingValue(k);
     await sample("map",m);
   }
   await endCalibration("cal_checkpoint");

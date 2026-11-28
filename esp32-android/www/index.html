@@ -11,8 +11,10 @@
 </head>
 <body data-page="drive" data-selecting="true">
   <header>
-    <h1><span class="mark" aria-hidden="true"></span>Whistle Bot</h1>
-    <button id="returnRovers" disabled>Rovers</button>
+    <button id="returnRovers" class="icon-button" aria-label="Return to rover list" disabled>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7M3 12h18"/></svg>
+    </button>
+    <h1><span class="mark" aria-hidden="true"></span><span class="app-name">Whistle Bot<small id="headerRover" hidden></small></span></h1>
     <output class="sr-only" id="connection">Connecting…</output>
     <div class="rover-power"><span class="sr-only">Rover battery </span><strong id="battery">—</strong></div>
   </header>
@@ -25,31 +27,37 @@
     <button id="reconnectRover" hidden></button>
     <button id="confirmedRest" hidden>I checked the rover is stopped. Return to rovers</button>
   </dialog>
+  <dialog id="forgetDialog" class="sheet" aria-labelledby="forgetTitle">
+    <h2 id="forgetTitle">Forget saved network?</h2>
+    <p>The rover will need its hotspot to set up home Wi-Fi again.</p>
+    <button id="keepNetwork" autofocus>Keep network</button>
+    <button id="confirmForget">Forget network</button>
+  </dialog>
   <section id="garage" aria-labelledby="garageTitle">
-    <h2 id="garageTitle">Your rovers</h2>
+    <div class="garage-heading"><h2 id="garageTitle">Your rovers</h2><button id="addRover" aria-label="Add rover">Add</button></div>
     <div id="roverCards"></div>
     <p id="selectionStatus" role="status"></p>
     <button id="retryRover" hidden>Retry</button>
     <button id="cancelSelection" hidden>Cancel</button>
-    <button id="addRover">Add rover</button>
     <section id="networkWizard" hidden>
+      <button id="closeWizard">Back to rovers</button>
       <div data-step="choose">
-        <button id="hotspotPath">Connect to rover hotspot</button>
-        <button id="lanPath">Search on home Wi-Fi</button>
+        <button id="hotspotPath"><span class="route-glyph hotspot-glyph" aria-hidden="true"></span>Connect to rover hotspot</button>
+        <button id="lanPath"><span class="route-glyph search-glyph" aria-hidden="true"></span>Search on home Wi-Fi</button>
       </div>
       <div data-step="hotspot" hidden>
         <h2>Join the rover hotspot</h2>
         <p>Power on the rover and wait for startup. In phone Wi-Fi settings, join its Whistle network using its hotspot password.</p>
-        <p>If the hotspot is missing, hold BOOT for at least 5 seconds. Keep holding while the light flashes purple. Release when it turns solid blue.</p>
+        <p>If the hotspot is missing, hold BOOT for at least 5 seconds. Keep holding while the light <span class="lamp purple">flashes purple</span>. Release when it turns <span class="lamp blue">solid blue</span>.</p>
         <p>Holding BOOT again keeps hotspot mode. Restart normally to reconnect to a saved home network.</p>
-        <button id="useHotspot">Identify rover</button>
+        <button id="useHotspot">Identify</button>
       </div>
       <div data-step="lan" hidden>
         <h2>Search on home Wi-Fi</h2>
-        <p>A solid green light indicates the rover is on home Wi-Fi. Join the same network on your phone.</p>
-        <button id="searchLan">Search rovers</button>
+        <p>A <span class="lamp green">solid green light</span> indicates the rover is on home Wi-Fi. Join the same network on your phone.</p>
+        <button id="searchLan">Search</button>
         <div id="foundRovers"></div>
-        <button id="useHotspotInstead">Use hotspot instead</button>
+        <button id="useHotspotInstead">Use hotspot</button>
       </div>
       <div data-step="identified" hidden>
         <h2 id="identifiedRover"></h2>
@@ -66,7 +74,6 @@
         <button id="verifyHome">Find this rover</button>
         <button id="switchHotspot">Return to hotspot setup</button>
       </div>
-      <button id="closeWizard">Back to rovers</button>
     </section>
   </section>
   <main>
@@ -173,6 +180,7 @@
       </div>
     </section>
     <section id="settings" aria-label="Settings" hidden>
+      <h2 class="page-title">Settings</h2>
       <div class="settings-tabs" role="group" aria-label="Settings panels">
         <button data-panel="wifiPanel" aria-controls="wifiPanel" aria-pressed="true">Wi-Fi</button>
         <button data-panel="chassisPanel" aria-controls="chassisPanel" aria-pressed="false">Chassis</button>
@@ -205,7 +213,7 @@
             <input id="gear3" data-gear-setting="3" type="number" inputmode="decimal" min="0.01" step="0.01" required value="0.80">
             <button data-adjust="1" aria-label="Increase G4 speed">+</button>
           </div>
-          <p id="gearStatus" role="status">Saved on this browser</p>
+          <p id="gearStatus" role="status">Saved on this phone</p>
         </section>
       </div>
       <div id="wifiPanel">
@@ -215,10 +223,10 @@
           <p id="networkAddress" hidden>Home address · <span id="homeLink"></span></p>
           <fieldset id="networkSetup" aria-label="Join a network" disabled>
             <div class="network-entry">
-              <label for="nearby">Nearby networks</label>
-              <select id="nearby" disabled><option value="">Scan to find networks</option></select>
+              <strong id="nearbyTitle">Nearby networks</strong>
               <button id="scanWifi" aria-label="Scan networks">Scan</button>
             </div>
+            <div id="nearby" role="group" aria-labelledby="nearbyTitle" hidden></div>
             <p id="scanStatus" role="status"></p>
             <label for="homeName">Network name</label>
             <input id="homeName" placeholder="Enter a network name" required maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false">
@@ -272,12 +280,6 @@
         <button data-jog="3">Jog M3</button>
         <button data-jog="4">Jog M4</button>
         <div id="mapping">
-          <label
-            >Left wheel<select id="leftChannel">
-              <option value="3">M3</option>
-              <option value="4">M4</option>
-            </select></label
-          >
         </div>
         <p>Saving a changed channel or direction clears the distance and turn calibrations.</p>
         </div>

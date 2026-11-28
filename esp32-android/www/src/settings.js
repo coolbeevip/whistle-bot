@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 "use strict";
 
-let setupAllowed = false;
+let setupAllowed = false, scanGraceUntil = 0;
 let wifiPoll = false, wifiRequest = false, wifiError = "";
 const panelButtons = [...document.querySelectorAll("button[data-panel]")];
 for (const button of panelButtons) button.onclick = () => {
@@ -13,25 +13,27 @@ for (const button of panelButtons) button.onclick = () => {
 };
 function highlightNetwork() {
   $("testWifi").disabled = !setupAllowed || !$("homeName").value.length;
-  $("nearby").value = $("homeName").value;
+  for (const row of $("nearby").children)
+    row.setAttribute("aria-pressed", String(row.textContent === $("homeName").value));
 }
 $("homeName").oninput = highlightNetwork;
-$("nearby").onchange = () => {
-  const name = $("nearby").value;
-  if (!name) return;
-  if ($("homeName").value !== name) $("homePass").value = "";
-  $("homeName").value = name;
-  highlightNetwork();
-  if (setupAllowed) $("homePass").focus();
-};
+
 function presentNetworks(names, scanning) {
   const list = $("nearby");
-  list.disabled = scanning || !names.length;
-  list.options[0].text = scanning ? "Scanning…" : names.length ? "Choose a network" : "Scan to find networks";
-  if (names.length !== list.options.length - 1 ||
-      names.some((name, i) => list.options[i + 1].value !== name)) {
-    list.length = 1;
-    for (const name of names) list.add(new Option(name, name));
+  list.hidden = scanning || names.length === 0;
+  if (names.length !== list.children.length || names.some((name, i) => list.children[i].textContent !== name)) {
+    const rows = names.map(name => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.textContent = name;
+      row.onclick = () => {
+        if ($("homeName").value !== name) $("homePass").value = "";
+        $("homeName").value = name;
+        highlightNetwork();
+      };
+      return row;
+    });
+    list.replaceChildren(...rows);
   }
   highlightNetwork();
 }
@@ -55,21 +57,22 @@ async function refreshWifi() {
     $("homeLink").textContent = net.home_ip;
     $("forgetWifi").hidden = !net.home_ssid;
     $("networkMessage").textContent = wifiError || (occupied ? "Finish driving or calibration first." : !setupAllowed ?
-      "To save a network, connect your phone to " + net.hotspot + " and identify it from Add rover." +
+      "To save a network, connect your phone to " + net.hotspot + " and open Add on the rover list." +
       (net.hotspot_on ? "" : " Hold BOOT for 5 seconds to enable the hotspot.") :
       (net.scan_state === "running" ? "" : net.message));
     if (wizardStep === "configure") offerSwitch(net);
     const names = net.networks || [];
     presentNetworks(names, net.scan_state === "running");
+    if (!net.busy && net.scan_state !== "running") scanGraceUntil = 0;
     $("scanWifi").textContent = net.scan_state === "running" ? "Scanning…" : "Scan";
-    $("scanStatus").textContent = net.scan_state === "running" ? "" :
+    $("scanStatus").textContent = net.scan_state === "running" ? "Searching for 2.4 GHz networks…" :
       net.scan_state === "failed" ? "Scan failed. Retry or enter a name." :
       names.length ? names.length + (names.length === 1 ? " network found." : " networks found.") :
       net.scan_state === "done" ? "No networks found." :
       "";
   } catch (e) {
     $("networkSetup").disabled = true;
-    $("networkStatus").textContent = e.message + ". Reconnecting…";
+    $("networkStatus").textContent = e.message + ". Check your connection.";
   } finally { wifiPoll = false; }
 }
 async function changeWifi(op,fields={}) {
@@ -77,8 +80,10 @@ async function changeWifi(op,fields={}) {
   wifiError = "";
   $("networkSetup").disabled = true;
   if (op === "wifi_scan") {
+    scanGraceUntil = Date.now() + 12000;
+    presentNetworks([],true);
     $("scanWifi").textContent = "Scanning…";
-    $("scanStatus").textContent = "";
+    $("scanStatus").textContent = "Searching for 2.4 GHz networks…";
   }
   try {
     if (op === "wifi_test" && wizardStep === "configure") savedNetwork = fields.ssid;
@@ -102,11 +107,17 @@ $("testWifi").onclick = () => {
   return changeWifi("wifi_test",{ssid:$("homeName").value,password:$("homePass").value});
 };
 $("forgetWifi").onclick = () => {
-  if (window.confirm("Forget the saved home network?")) changeWifi("wifi_forget");
+  $("forgetDialog").showModal();
+};
+$("keepNetwork").onclick = () => $("forgetDialog").close();
+$("confirmForget").onclick = () => {
+  $("forgetDialog").close();
+  if (setupAllowed && session && !$("networkSetup").disabled) changeWifi("wifi_forget");
 };
 setInterval(refreshWifi, 1000);
 function showPage(next) {
   page = next;
+  $("driveToast").hidden = true;
   say("");
   render();
   document.querySelector("main").scrollTop = 0;
