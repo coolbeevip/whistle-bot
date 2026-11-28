@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   />
-  <meta name="theme-color" content="#141718" /><title>Whistle Bot</title>
+  <meta name="theme-color" content="#f2f4f7" /><title>Whistle Bot</title>
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body data-page="drive" data-selecting="true">
@@ -101,20 +101,30 @@
             </tbody>
           </table>
         </div>
-        <div class="instrument-card">
+        <div class="instrument-card chassis-card">
           <h2 class="instrument-title">Chassis</h2>
-          <dl id="chassisReadings">
-            <div><dt>Driver</dt><dd id="driver">—</dd></div>
-            <div><dt>Owner</dt><dd id="owner">—</dd></div>
-            <div><dt>M3 encoder</dt><dd id="m3">—</dd></div>
-            <div><dt>M4 encoder</dt><dd id="m4">—</dd></div>
+          <dl class="motion-readings">
             <div><dt>Speed (m/s)</dt><dd id="actualSpeed">—</dd></div>
             <div><dt>Wheels</dt><dd id="still">—</dd></div>
-            <div><dt>Feedback age</dt><dd id="age">—</dd></div>
-            <div><dt>PWM L/R</dt><dd id="wheelPwm">—</dd></div>
-            <div class="wide-reading"><dt>Target L/R (ticks/s)</dt><dd id="wheelTarget">—</dd></div>
-            <div class="wide-reading"><dt>Measured L/R (ticks/s)</dt><dd id="wheelRate">—</dd></div>
           </dl>
+          <details id="chassisDetails">
+            <summary>Diagnostics</summary>
+            <dl id="chassisReadings">
+              <div><dt>Driver</dt><dd id="driver">—</dd></div>
+              <div><dt>Owner</dt><dd id="owner">—</dd></div>
+              <div><dt>Feedback age</dt><dd id="age">—</dd></div>
+              <div><dt>M3 encoder</dt><dd id="m3">—</dd></div>
+              <div><dt>M4 encoder</dt><dd id="m4">—</dd></div>
+            </dl>
+            <table class="instrument" id="wheelReadings" aria-label="Wheel diagnostics">
+              <thead><tr><td></td><th scope="col">Left</th><th scope="col">Right</th></tr></thead>
+              <tbody>
+                <tr id="wheelPwm"><th scope="row">PWM</th><td>—</td><td>—</td></tr>
+                <tr id="wheelTarget"><th scope="row">Target (ticks/s)</th><td>—</td><td>—</td></tr>
+                <tr id="wheelRate"><th scope="row">Measured (ticks/s)</th><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </details>
         </div>
       </section>
       <div class="drive-switch" role="group" aria-label="Drive mode">

@@ -352,7 +352,7 @@ test("Motor telemetry and battery alarm", async t => {
   await p.locator("#imuReadings").waitFor();
   assert.equal(await p.textContent("#m3"),"123");
   assert.equal(await p.textContent("#m4"),"456");
-  assert.equal(await p.textContent("#wheelPwm"),"75 / 90");
+  assert.deepEqual(await p.locator("#wheelPwm td").allTextContents(), ["75", "90"]);
 });
 
 test("Holding Forward suppresses the context menu and still releases control", async t => {
@@ -658,6 +658,8 @@ test("Narrow layout keeps related drive controls on one line", async t => {
 
 test("Telemetry values stay on one line without shifting the drive controls", async t => {
   const {p,board} = await open(t);
+  assert.ok(await p.locator("#m3").isHidden());
+  await p.locator("#chassisDetails summary").click();
   for (const width of [320, 390, 760]) {
     await p.setViewportSize({width,height:844});
     board.event({owner:"free",settled:true,m3_ticks:1,m4_ticks:2});

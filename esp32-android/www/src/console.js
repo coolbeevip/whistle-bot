@@ -250,9 +250,16 @@ function render() {
     : ready
       ? "Not settled"
       : "Unknown";
-  $("wheelTarget").textContent = ready ? [last.left_target_ticks_s,last.right_target_ticks_s].join(" / ") : "—";
-  $("wheelRate").textContent = ready && last.rate_window_ms ? [last.left_ticks_s,last.right_ticks_s].join(" / ") : "—";
-  $("wheelPwm").textContent = ready ? [last.left_pwm,last.right_pwm].join(" / ") : "—";
+  const wheelPairs = [
+    ["wheelPwm", ready, last.left_pwm, last.right_pwm],
+    ["wheelTarget", ready, last.left_target_ticks_s, last.right_target_ticks_s],
+    ["wheelRate", ready && last.rate_window_ms, last.left_ticks_s, last.right_ticks_s],
+  ];
+  for (const [id, available, left, right] of wheelPairs) {
+    const cells = $(id).children;
+    cells[1].textContent = (available ? left : null) ?? "—";
+    cells[2].textContent = (available ? right : null) ?? "—";
+  }
   $("m3").textContent = fresh ? last.m3_ticks ?? "—" : "—";
   $("m4").textContent = fresh ? last.m4_ticks ?? "—" : "—";
   $("age").textContent = ready && Number.isFinite(last.feedback_age_ms) ? last.feedback_age_ms + " ms" : "—";
